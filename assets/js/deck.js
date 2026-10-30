@@ -163,7 +163,6 @@
       dist: dist,
       total: total,
       mean: total ? weighted / total : 0,
-      top2: total ? (dist[max - 1] + (dist[max - 2] || 0)) / total : 0,
       /* nilai yang paling banyak dipilih → yang kedua → dst. */
       ranked: dist.map(function (c, idx) { return { v: idx + 1, c: c }; })
         .sort(function (a, b) { return b.c - a.c || b.v - a.v; }),
@@ -254,31 +253,59 @@
     var sec = document.createElement("section");
     var totalQ = m.likert.length + (m.choice ? 1 : 0);
 
-    var rows = m.likert.map(function (l, i) {
-      return '<button type="button" class="sr" data-i="' + (i + 1) + '">' +
-        '<span class="sr__label">' + FMT.esc(l.label) +
-        '<span class="track"><u></u></span></span>' +
-        '<b><em class="fr">0</em> dari 10</b></button>';
+    function ringSvg() {
+      return '<span class="card__ring">' +
+        '<svg viewBox="0 0 40 40" aria-hidden="true">' +
+          '<circle class="ring__bg" cx="20" cy="20" r="17" pathLength="100"></circle>' +
+          '<circle class="ring__fg" cx="20" cy="20" r="17" pathLength="100"></circle>' +
+        "</svg>" +
+        '<span class="card__pc">0%</span>' +
+      "</span>";
+    }
+
+    var cards = m.likert.map(function (l, i) {
+      return '<button type="button" class="card" data-i="' + (i + 1) + '">' +
+        ringSvg() +
+        '<span class="card__t">' +
+          '<span class="card__n">' + FMT.esc(l.label) + "</span>" +
+          '<b class="card__v"><em>0</em></b>' +
+          '<i class="card__s">—</i>' +
+        "</span></button>";
     }).join("");
 
+    var pick = "";
     if (m.choice) {
-      rows += '<button type="button" class="sr" data-i="' + totalQ + '">' +
-        '<span class="sr__label">Paling rela dikurangi<small></small>' +
-        '<span class="track"><u></u></span></span>' +
-        '<b><em class="pv">0</em>%</b></button>';
+      pick = '<button type="button" class="pick" data-i="' + totalQ + '">' +
+        '<b class="pick__v"><em class="pv">0</em></b>' +
+        '<span class="pick__t"><span class="pick__l">—</span>' +
+        '<i class="pick__n">0 dari ' + m.n + " responden</i></span>" +
+        "</button>";
     }
 
     sec.innerHTML =
-      '<div class="meta"><span>Ringkasan</span><span>' + totalQ + " pertanyaan</span></div>" +
+      '<div class="meta"><span>Ringkasan</span><span>' + totalQ + " pertanyaan · " + m.n + " responden</span></div>" +
       "<h2>" + FMT.esc(CFG.SUMMARY_HEADLINE || "Hasil sementara survei") + "</h2>" +
-      '<p class="note">Angka di kanan = dari 10 dosen yang memberi nilai 5 atau 6 · ' + m.n + " responden</p>" +
-      '<div class="body">' +
-        '<div class="L"><div class="big" data-n>0</div>' +
-        '<p class="cap">responden telah mengisi survei ini</p></div>' +
-        '<div class="R sum">' + rows + "</div>" +
-      "</div>";
+      '<p class="note">Angka besar = jumlah dosen yang memilih nilai terbanyak · cincin = persentasenya</p>' +
+      '<div class="cards">' + cards + "</div>" +
+      pick;
 
-    sec.__refs = { n: $("[data-n]", sec), sr: $$(".sr", sec) };
+    sec.__refs = {
+      cards: $$(".card", sec).map(function (el) {
+        return {
+          el: el,
+          pc: $(".card__pc", el),
+          v: $(".card__v em", el),
+          s: $(".card__s", el),
+          ring: $(".ring__fg", el)
+        };
+      }),
+      pick: {
+        el: $(".pick", sec),
+        pv: $(".pv", sec),
+        l: $(".pick__l", sec),
+        n: $(".pick__n", sec)
+      }
+    };
     return sec;
   }
 
@@ -362,39 +389,47 @@
     var instant = mode === "instant";
     var replay = mode === "replay" && canAnimate();
 
-    if (replay) {
-      r.n.__num = { v: 0 };
-      r.n.textContent = "0";
-      r.sr.forEach(function (row) {
-        var u = row.querySelector("u");
-        if (u) gsap.set(u, { width: "0%" });
-        var b = row.querySelector("b em");
-        if (b) { b.__num = { v: 0 }; b.textContent = "0"; }
-      });
-      gsap.fromTo(r.sr, { opacity: 0 }, { opacity: 1, duration: .45, stagger: .05, ease: "power2.out", overwrite: true });
+    function drawRing(el, pct, delay) {
+      if (!el) return;
+      var off = Math.max(0, 100 - Math.min(100, pct));
+      if (instant || !canAnimate()) { el.style.strokeDashoffset = off; return; }
+      gsap.to(el, { strokeDashoffset: off, duration: .95, delay: delay || 0, ease: "power2.out", overwrite: true });
     }
 
-    var delay = replay ? .05 : 0;
-    setNum(r.n, m.n, { instant: instant, duration: 1.1 });
+    if (replay) {
+      r.cards.forEach(function (c) {
+        c.pc.__num = { v: 0 }; c.pc.textContent = "0%";
+        c.v.__num = { v: 0 }; c.v.textContent = "0";
+        if (c.ring) gsap.set(c.ring, { strokeDashoffset: 100 });
+      });
+      if (r.pick.el) {
+        r.pick.pv.__num = { v: 0 }; r.pick.pv.textContent = "0%";
+      }
+      gsap.fromTo(r.cards.map(function (c) { return c.el; }),
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: .5, stagger: .06, ease: "power2.out", overwrite: true });
+    }
 
     m.likert.forEach(function (l, i) {
-      var row = r.sr[i];
-      if (!row) return;
-      var d = delay + i * .06;
-      setNum(row.querySelector("b em"), l.top2 * 10, { instant: instant, duration: .9, delay: d });
-      sizeTo(row.querySelector("u"), "width", Math.max(1, l.top2 * 100), { instant: instant, duration: .9, delay: d });
+      var c = r.cards[i];
+      if (!c) return;
+      var top = l.ranked[0] || { v: l.max, c: 0 };
+      var pct = l.total ? (top.c / l.total) * 100 : 0;
+      var ends = scaleEnds(l.q);
+      var d = replay ? .06 + i * .05 : 0;
+
+      setNum(c.pc, pct, { instant: instant, fmt: fmtPct, duration: .9, delay: d });
+      setNum(c.v, top.c, { instant: instant, duration: .9, delay: d });
+      c.s.textContent = "memilih angka " + top.v + (top.v === l.max ? " (" + ends.right + ")" : "");
+      drawRing(c.ring, pct, d);
     });
 
-    if (m.choice) {
-      var rowC = r.sr[m.likert.length];
+    if (m.choice && r.pick.el) {
       var lead = m.choice.options[0];
-      if (rowC && lead) {
-        var dc = delay + m.likert.length * .06;
-        setNum(rowC.querySelector("b em"), lead.share * 100, { instant: instant, duration: .9, delay: dc });
-        sizeTo(rowC.querySelector("u"), "width", lead.share * 100, { instant: instant, duration: .9, delay: dc });
-        var small = rowC.querySelector("small");
-        if (small) small.textContent = lead.label;
-      }
+      var dp = replay ? .06 + m.likert.length * .05 : 0;
+      setNum(r.pick.pv, lead.share * 100, { instant: instant, fmt: fmtPct, duration: .9, delay: dp });
+      r.pick.l.textContent = "memilih " + lead.label;
+      r.pick.n.textContent = lead.count + " dari " + m.choice.total + " responden";
     }
   }
 
