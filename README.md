@@ -88,19 +88,20 @@ File `.nojekyll` sudah disertakan agar folder `assets/` tidak diproses Jekyll.
 | Langkah | Yang terjadi |
 |---|---|
 | Halaman dibuka | `GET /exec` → JSON lengkap (kolom, tipe, baris) |
-| Tiap 2 detik | `GET /exec?action=ping` → hanya versi + jumlah baris |
-| Versi berubah | Ambil data lengkap, lalu angka & batang bertween ke nilai baru |
+| Tiap 2 detik | `GET /exec` → JSON lengkap; versinya dibandingkan di browser |
+| Versi berubah | Angka & batang bertween ke nilai baru (tanpa permintaan tambahan) |
 | Form terkirim | Baris baru masuk → versi berubah (trigger `onFormSubmit` mempercepat) |
 
 Versi = nomor bump + jumlah baris + hash baris terakhir, sehingga perubahan isi
-sel juga terdeteksi. Jawaban ping di-cache 1 detik (`PING_SECONDS`) dan data
-lengkap 20 detik (`CACHE_SECONDS`); cache data dikunci per versi, jadi data baru
-tidak pernah disajikan dari cache lama.
+sel juga terdeteksi. Satu putaran polling hanya memakai **satu** permintaan ke
+Apps Script; dulu dua (ping lalu data) sehingga latensinya dobel.
 
-**Latensi normal: 2–4 detik** setelah kiriman masuk. Untuk lebih cepat lagi,
-turunkan `POLL_MS` ke 1000 — tapi permintaan ke Apps Script ikut berlipat.
-Kalau yang membuka halaman banyak (mis. 20+ orang bersamaan), naikkan `POLL_MS`
-ke 5000–8000 agar kuota Apps Script tidak cepat habis.
+**Latensi normal: 2–4 detik** setelah kiriman masuk. Batas bawahnya adalah waktu
+respons Apps Script itu sendiri (±2–3 detik per permintaan, termasuk satu
+pengalihan `script.google.com` → `script.googleusercontent.com`), jadi
+menurunkan `POLL_MS` di bawah ~2500 tidak banyak menolong. Kalau yang membuka
+halaman banyak (mis. 20+ orang bersamaan), naikkan `POLL_MS` ke 5000–8000 agar
+kuota Apps Script tidak cepat habis.
 
 ---
 

@@ -198,11 +198,6 @@
       });
   }
 
-  function fetchPing() {
-    if (MOCK) return Promise.resolve(MOCK_DATA.ping());
-    return jsonp(ENDPOINT, { action: "ping", _t: Date.now() }, 12000);
-  }
-
   function fetchData(fresh) {
     if (MOCK) return Promise.resolve(MOCK_DATA.payload(true));
     return jsonp(ENDPOINT, { _t: Date.now(), fresh: fresh ? "1" : "0" }, 20000);
@@ -232,23 +227,24 @@
       state.inflight = true;
       var stale = Date.now() - state.lastFull > FULL_REFRESH_MS;
 
-      return fetchPing()
-        .then(function (ping) {
-          if (!ping || ping.ok === false) throw new Error("ping gagal");
-          var changed = String(ping.v || "") !== state.version;
-          if (!changed && !stale) return null;
-          return fetchData(false).then(function (payload) {
-            if (!payload || payload.ok === false) throw new Error("data gagal");
+      /* Satu permintaan saja per putaran: ambil data lengkap lalu bandingkan
+         versinya di browser. Lebih cepat daripada ping lalu ambil data,
+         karena setiap permintaan ke Apps Script butuh ~2 detik. */
+      return fetchData(false)
+        .then(function (payload) {
+          if (!payload || payload.ok === false) throw new Error("data gagal");
+          var changed = String(payload.v || "") !== state.version;
+          state.inflight = false;
+
+          if (changed || stale) {
             state.version = String(payload.v || "");
             state.lastFull = Date.now();
+            if (state.handlers.data) state.handlers.data(payload);
+            if (state.handlers.status) state.handlers.status("ok", { mock: MOCK, at: new Date() });
             return payload;
-          });
-        })
-        .then(function (payload) {
-          state.inflight = false;
-          if (payload && state.handlers.data) state.handlers.data(payload);
+          }
           if (state.handlers.status) state.handlers.status("ok", { mock: MOCK, at: new Date() });
-          return payload || null;
+          return null;
         })
         .catch(function (err) {
           state.inflight = false;
@@ -261,27 +257,39 @@
       state.handlers = handlers || {};
       var self = this;
 
-      function loop() {
+      function schedule(ms) {
         clearTimeout(state.timer);
-        state.timer = setTimeout(function () {
-          if (document.hidden) { loop(); return; }
-          if (MOCK) {
-            if (SNAPSHOT) {
-              if (state.handlers.status) state.handlers.status("snapshot", { mock: true, at: new Date() });
-            } else {
-              MOCK_DATA.tick();
-              if (state.handlers.data) state.handlers.data(MOCK_DATA.payload(true));
-              if (state.handlers.status) state.handlers.status("ok", { mock: true, at: new Date() });
-            }
+        state.timer = setTimeout(tick, Math.max(0, ms));
+      }
+
+      /* Jeda dihitung dari saat permintaan SEBELUMNYA dimulai. Kalau Apps Script
+         butuh ~3 detik, putaran berikutnya langsung jalan 200 ms setelah selesai,
+         jadi tidak menunggu dua kali lipat (2 dtk + 3 dtk). */
+      function tick() {
+        if (document.hidden) { schedule(POLL_MS); return; }
+
+        if (MOCK) {
+          if (SNAPSHOT) {
+            if (state.handlers.status) state.handlers.status("snapshot", { mock: true, at: new Date() });
           } else {
-            self.check().catch(function () { /* status sudah dilaporkan */ });
+            MOCK_DATA.tick();
+            if (state.handlers.data) state.handlers.data(MOCK_DATA.payload(true));
+            if (state.handlers.status) state.handlers.status("ok", { mock: true, at: new Date() });
           }
-          loop();
-        }, POLL_MS);
+          schedule(POLL_MS);
+          return;
+        }
+
+        var t0 = Date.now();
+        self.check()
+          .catch(function () { /* status sudah dilaporkan */ })
+          .then(function () {
+            schedule(POLL_MS - (Date.now() - t0));
+          });
       }
 
       if (state.handlers.status) state.handlers.status(MOCK ? "mock" : "connecting", { mock: MOCK, at: new Date() });
-      loop();
+      schedule(POLL_MS);
     },
 
     stop: function () {
