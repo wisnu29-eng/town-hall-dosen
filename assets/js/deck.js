@@ -165,9 +165,6 @@
       total: total,
       mean: total ? weighted / total : 0,
       top2: total ? (dist[max - 1] + (dist[max - 2] || 0)) / total : 0,
-      topCount: total ? (dist[max - 1] || 0) + (dist[max - 2] || 0) : 0,
-      /* skor aspek: total bobot ÷ skor maksimum yang mungkin, dalam persen */
-      pct: total ? (weighted / (total * max)) * 100 : 0,
       maxDist: maxDist
     };
   }
@@ -249,29 +246,7 @@
     return { left: "Terendah", right: "Tertinggi", cap: "menilai tinggi" };
   }
 
-  /* Kategori skor Likert: 0–20–40–60–80–100 % dari skor maksimum. */
-  var BANDS = (CFG.BANDS && CFG.BANDS.length) ? CFG.BANDS : [
-    { max: 20, label: "Sangat tidak penting" },
-    { max: 40, label: "Tidak penting" },
-    { max: 60, label: "Cukup penting" },
-    { max: 80, label: "Penting" },
-    { max: 100, label: "Sangat penting" }
-  ];
-
-  function bandFor(pct) {
-    for (var i = 0; i < BANDS.length; i++) {
-      if (pct <= BANDS[i].max + 1e-6) {
-        return {
-          i: i,
-          label: BANDS[i].label,
-          from: i === 0 ? 0 : BANDS[i - 1].max,
-          to: BANDS[i].max
-        };
-      }
-    }
-    var last = BANDS[BANDS.length - 1];
-    return { i: BANDS.length - 1, label: last.label, from: BANDS[BANDS.length - 2] ? BANDS[BANDS.length - 2].max : 0, to: last.max };
-  }
+  /* Kategori skor Likert tidak ditampilkan; slide memakai sebaran jawaban. */
 
   function summarySection(m) {
     var sec = document.createElement("section");
@@ -318,9 +293,6 @@
     var ax = "";
     for (var a = 1; a <= l.max; a++) ax += "<i>" + a + "</i>";
 
-    var segs = "";
-    for (var b = 0; b < BANDS.length; b++) segs += "<span></span>";
-
     sec.innerHTML =
       '<div class="meta"><span>Pertanyaan ' + (i + 1) + " dari " + totalQ + "</span>" +
       "<span>" + m.n + " responden · skala 1–" + l.max + "</span></div>" +
@@ -329,12 +301,9 @@
         '<div class="L">' +
           '<div class="big"><b class="fr">0</b><span> dari 10</span></div>' +
           '<p class="cap">dosen memberi nilai ' + (l.max - 1) + "–" + l.max + "</p>" +
-          '<div class="gauge">' +
-            '<div class="gauge__track" style="grid-template-columns:repeat(' + BANDS.length + ',1fr)">' +
-              segs + '<i class="gauge__mark" style="left:0%"></i>' +
-            "</div>" +
-            '<div class="gauge__ax"><span>0%</span><span>100%</span></div>' +
-            '<p class="gauge__cap"><b class="gp">0%</b> dari skor maksimum · <span class="gr">—</span></p>' +
+          '<div class="split">' +
+            "<p><b class=\"sp\">0%</b><span>dosen menilai " + (l.max - 1) + "</span><i class=\"sn\">0 dari " + m.n + "</i></p>" +
+            "<p><b class=\"sp\">0%</b><span>dosen menilai " + l.max + "</span><i class=\"sn\">0 dari " + m.n + "</i></p>" +
           "</div>" +
         "</div>" +
         '<div class="R"><div class="plot">' + cols + "</div>" +
@@ -344,10 +313,8 @@
 
     sec.__refs = {
       fr: $(".fr", sec),
-      gp: $(".gp", sec),
-      gr: $(".gr", sec),
-      mark: $(".gauge__mark", sec),
-      segs: $$(".gauge__track span", sec),
+      sp: $$(".split .sp", sec),
+      sn: $$(".split .sn", sec),
       cols: $$(".col", sec),
       bars: $$(".bar", sec),
       ems: $$(".bar em", sec)
@@ -430,36 +397,40 @@
     var r = sec.__refs;
     var instant = mode === "instant";
     var replay = mode === "replay" && canAnimate();
-    var band = bandFor(l.pct);
+    var cLo = l.dist[l.max - 2] || 0;
+    var cHi = l.dist[l.max - 1] || 0;
 
     if (replay) {
       if (r.fr.__tw) { r.fr.__tw.kill(); r.fr.__tw = null; }
       r.fr.__num = { v: 0 }; r.fr.textContent = "0";
-      if (r.gp.__tw) { r.gp.__tw.kill(); r.gp.__tw = null; }
-      r.gp.__num = { v: 0 }; r.gp.textContent = "0%";
+      r.sp.forEach(function (el) {
+        if (el.__tw) { el.__tw.kill(); el.__tw = null; }
+        el.__num = { v: 0 }; el.textContent = "0%";
+      });
       r.ems.forEach(function (e) {
         if (e.__tw) { e.__tw.kill(); e.__tw = null; }
         e.__num = { v: 0 }; e.textContent = "0";
       });
       r.bars.forEach(function (b) { gsap.set(b, { height: "0%" }); });
-      gsap.set(r.mark, { left: "0%" });
     }
 
-    /* angka besar: berapa dari 10 dosen yang memilih nilai tertinggi */
+    /* angka besar: berapa dari 10 dosen yang memilih dua nilai tertinggi */
     setNum(r.fr, l.top2 * 10, { instant: instant, duration: 1, delay: replay ? .04 : 0 });
-    /* skor aspek + kategorinya */
-    setNum(r.gp, l.pct, { instant: instant, fmt: fmtPct, duration: 1, delay: replay ? .12 : 0 });
-    r.gr.textContent = band.label + " (" + band.from + "–" + band.to + "%)";
-    r.segs.forEach(function (s, k) { s.classList.toggle("on", k === band.i); });
-    sizeTo(r.mark, "left", Math.min(100, Math.max(0, l.pct)), { instant: instant, duration: .95, delay: replay ? .2 : 0 });
+
+    /* rincian dua nilai tertinggi */
+    var d = replay ? .12 : 0;
+    setNum(r.sp[0], l.total ? (cLo / l.total) * 100 : 0, { instant: instant, fmt: fmtPct, duration: .9, delay: d });
+    setNum(r.sp[1], l.total ? (cHi / l.total) * 100 : 0, { instant: instant, fmt: fmtPct, duration: .9, delay: d + .06 });
+    if (r.sn[0]) r.sn[0].textContent = cLo + " dari " + l.total;
+    if (r.sn[1]) r.sn[1].textContent = cHi + " dari " + l.total;
 
     r.cols.forEach(function (col, k) {
       var v = l.dist[k] || 0;
       var pct = l.maxDist ? (v / l.maxDist) * 100 : 0;
       col.classList.toggle("mode", v === l.maxDist && v > 0);
-      var d = replay ? .08 + k * .05 : 0;
-      sizeTo(col.querySelector(".bar"), "height", pct, { instant: instant, duration: .95, delay: d });
-      setNum(col.querySelector("em"), v, { instant: instant, duration: .95, delay: d });
+      var dd = replay ? .08 + k * .05 : 0;
+      sizeTo(col.querySelector(".bar"), "height", pct, { instant: instant, duration: .95, delay: dd });
+      setNum(col.querySelector("em"), v, { instant: instant, duration: .95, delay: dd });
     });
   }
 

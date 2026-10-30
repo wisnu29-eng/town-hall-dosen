@@ -140,17 +140,17 @@ DISPLAY_SCALE: 1      // 0.9 = lebih kecil, 1.1 = lebih besar
 Teks skala ("Sangat tidak penting" … "Sangat penting") dipilih otomatis dari kata
 kunci pada pertanyaan: *penting*, *setuju*, *puas*, *sering*.
 
-**Cara angka Likert dihitung.** Tiap slide aspek memakai dua ukuran yang berbeda:
+**Cara angka Likert dihitung.** Tiap slide aspek menampilkan dua hal:
 
 1. **Angka besar `8 dari 10`** — proporsi dosen yang memilih dua nilai tertinggi
-   (5 atau 6). Dipakai karena paling mudah diucapkan di rapat.
-2. **Skor aspek** — Σ semua jawaban ÷ (jumlah responden × nilai maksimum) × 100%.
-   Skor ini dipetakan ke kategori: `0–20` sangat tidak penting, `20–40` tidak
-   penting, `40–60` cukup penting, `60–80` penting, `80–100` sangat penting.
-   Batas rentang bisa diubah di `BANDS` (config.js).
+   (5 atau 6), dibulatkan ke satuan per sepuluh. Dipakai karena paling mudah
+   diucapkan di rapat.
+2. **Rincian per nilai** — `27% dosen menilai 5 · 40 dari 151` dan
+   `15% dosen menilai 6 · 22 dari 151`, supaya terlihat dari mana angka besar
+   itu berasal.
 
-Kategori ditampilkan sebagai bilah lima segmen dengan penanda posisi skor,
-jadi pimpinan langsung melihat aspek itu berada di rentang mana.
+Grafik batang di kanan menunjukkan sebaran seluruh jawaban 1–6 (jumlah orang
+per nilai). Tidak ada skor rata-rata atau kategori yang ditampilkan.
 
 **Tautan ke slide tertentu**: buka `index.html#4` untuk langsung ke slide ke-4
 (berguna saat rapat atau saat mengirim tautan ke bagian tertentu).
