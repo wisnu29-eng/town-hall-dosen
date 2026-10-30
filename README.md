@@ -57,8 +57,12 @@ API_URL: "https://script.google.com/macros/s/XXXX/exec",
 ```
 
 Simpan. Halaman langsung memakai data asli. Selama `API_URL` kosong, halaman
-berjalan dengan **data contoh** (bentuknya sama dengan survei asli) agar tampilan
-bisa dinilai lebih dulu.
+menampilkan **potret data asli** dari `assets/data/snapshot.json` (angka di layar
+sama dengan isi sheet saat potret dibuat, tetapi belum ikut berubah). Potret itu
+hanya untuk pratinjau — setelah `API_URL` diisi, file tersebut tidak dipakai lagi.
+
+> Ingin memperbarui potret? Jalankan ulang skrip pembuatnya, atau cukup isi
+> `API_URL` dan data akan selalu segar.
 
 ## 3. Hosting GitHub Pages
 

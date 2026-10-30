@@ -12,6 +12,11 @@
   var MOCK = CFG.MOCK === null || CFG.MOCK === undefined ? !ENDPOINT : !!CFG.MOCK;
   var POLL_MS = CFG.POLL_MS || 10000;
   var FULL_REFRESH_MS = CFG.FULL_REFRESH_MS || 300000;
+  var SNAPSHOT_URL = CFG.SNAPSHOT_URL || "assets/data/snapshot.json";
+
+  /* Pratinjau: bila API_URL kosong, pakai potret data asli (bukan data palsu). */
+  var SNAPSHOT = null;
+  var snapshotTried = false;
 
   var state = {
     version: null,
@@ -171,6 +176,28 @@
   })();
 
   /* ------------------------------------------------------------- REQUESTS -- */
+  function loadSnapshot() {
+    if (SNAPSHOT) return Promise.resolve(SNAPSHOT);
+    if (snapshotTried) return Promise.resolve(MOCK_DATA.payload(true));
+    snapshotTried = true;
+
+    return fetch(SNAPSHOT_URL, { cache: "no-store" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("snapshot " + r.status);
+        return r.json();
+      })
+      .then(function (json) {
+        if (!json || !json.rows || !json.rows.length) throw new Error("snapshot kosong");
+        json.demo = true;
+        SNAPSHOT = json;
+        API.isSnapshot = true;
+        return json;
+      })
+      .catch(function () {
+        return MOCK_DATA.payload(true);
+      });
+  }
+
   function fetchPing() {
     if (MOCK) return Promise.resolve(MOCK_DATA.ping());
     return jsonp(ENDPOINT, { action: "ping", _t: Date.now() }, 12000);
@@ -184,9 +211,11 @@
   /* --------------------------------------------------------------- PUBLIC -- */
   var API = {
     isMock: MOCK,
+    isSnapshot: false,
     endpoint: ENDPOINT,
 
     load: function (opts) {
+      if (MOCK) return loadSnapshot();
       opts = opts || {};
       return fetchData(!!opts.force).then(function (payload) {
         if (!payload || payload.ok === false) {
@@ -237,9 +266,13 @@
         state.timer = setTimeout(function () {
           if (document.hidden) { loop(); return; }
           if (MOCK) {
-            MOCK_DATA.tick();
-            if (state.handlers.data) state.handlers.data(MOCK_DATA.payload(true));
-            if (state.handlers.status) state.handlers.status("ok", { mock: true, at: new Date() });
+            if (SNAPSHOT) {
+              if (state.handlers.status) state.handlers.status("snapshot", { mock: true, at: new Date() });
+            } else {
+              MOCK_DATA.tick();
+              if (state.handlers.data) state.handlers.data(MOCK_DATA.payload(true));
+              if (state.handlers.status) state.handlers.status("ok", { mock: true, at: new Date() });
+            }
           } else {
             self.check().catch(function () { /* status sudah dilaporkan */ });
           }

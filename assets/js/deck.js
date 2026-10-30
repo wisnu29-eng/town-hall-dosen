@@ -518,7 +518,13 @@
 
     $("#nCount").textContent = FMT.num(m.n);
     $("#updated").textContent = FMT.clock(new Date());
-    $("#src").textContent = m.sheet || CFG.SOURCE_LABEL || "Google Sheets";
+    $("#src").textContent = sourceLabel(m);
+  }
+
+  function sourceLabel(m) {
+    if (!API.isMock) return m.sheet || CFG.SOURCE_LABEL || "Google Sheets";
+    if (API.isSnapshot) return "Data asli · mode pratinjau";
+    return "Data contoh";
   }
 
   /* ----------------------------------------------------------------- SHOW -- */
