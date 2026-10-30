@@ -113,6 +113,7 @@ h2{
   margin:1.6rem 0 0;font-weight:400;font-size:2.15rem;line-height:1.2;
   letter-spacing:-.022em;max-width:44ch;
 }
+.note{margin:.7rem 0 0;font-size:.92rem;line-height:1.4;color:var(--grey-3)}
 .body{flex:1;min-height:0;display:grid;grid-template-columns:5fr 6fr;gap:3.6rem;padding-top:2rem}
 .L{display:flex;flex-direction:column;justify-content:flex-end;gap:1.1rem;min-width:0;container-type:inline-size}
 .R{display:flex;flex-direction:column;min-height:0;min-width:0}
@@ -166,16 +167,16 @@ h2{
 /* summary */
 .sum{display:flex;flex-direction:column;min-height:0}
 .sr{
-  flex:1;display:grid;grid-template-columns:1.8rem 1fr 5.4rem;gap:1.1rem;align-items:center;
+  flex:1;display:grid;grid-template-columns:1fr auto;gap:1.2rem;align-items:center;
   border:0;border-top:1px solid var(--line);min-height:0;padding:0;
 }
 .sr:first-child{border-top:0}
-.sr i{font-style:normal;color:var(--accent);font-size:.95rem}
 .sr__label{font-size:1.22rem;line-height:1.2;min-width:0}
 .sr__label .track{margin-top:.5rem}
 .sr small{display:block;margin-top:.15rem;font-size:.85rem;color:var(--grey-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sr b{font-weight:300;font-size:1.9rem;text-align:right;letter-spacing:-.02em}
-.sr:hover b{color:var(--accent)}
+.sr b{font-weight:300;font-size:1.15rem;text-align:right;letter-spacing:-.01em;color:var(--grey-3);white-space:nowrap}
+.sr b em{font-style:normal;font-size:1.9rem;letter-spacing:-.02em;color:var(--ink);margin-right:.15rem}
+.sr:hover b em{color:var(--accent)}
 
 /* states */
 .empty{
@@ -212,7 +213,7 @@ h2{
   .big{font-size:6.4rem}
   .big span{font-size:1.7rem}
   .plot{min-height:15rem}
-  .sr{grid-template-columns:1.5rem 1fr 4.5rem}
+  .sr{grid-template-columns:1fr auto}
   .sr .track{display:none}
   .cap{max-width:none}
 }

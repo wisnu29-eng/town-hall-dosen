@@ -152,6 +152,10 @@ kunci pada pertanyaan: *penting*, *setuju*, *puas*, *sering*.
 Grafik batang di kanan menunjukkan sebaran seluruh jawaban 1–6 (jumlah orang
 per nilai). Tidak ada skor rata-rata atau kategori yang ditampilkan.
 
+Slide **Ringkasan** memakai ukuran yang sama (`8 dari 10` per aspek), tanpa
+nomor urut dan tanpa rata-rata, dengan catatan kecil di bawah judul agar arti
+angkanya jelas bagi pembaca baru.
+
 **Tautan ke slide tertentu**: buka `index.html#4` untuk langsung ke slide ke-4
 (berguna saat rapat atau saat mengirim tautan ke bagian tertentu).
 

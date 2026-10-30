@@ -37,7 +37,6 @@
   /* ------------------------------------------------------------- ANGKA ----- */
   function fmtInt(v) { return FMT.num(Math.round(v)); }
   function fmtPct(v) { return Math.round(v) + "%"; }
-  function fmtMean(v) { return FMT.num(v, 2); }
 
   /** Tulis angka, berjalan halus dari nilai sebelumnya. */
   function setNum(node, value, opt) {
@@ -254,23 +253,22 @@
 
     var rows = m.likert.map(function (l, i) {
       return '<button type="button" class="sr" data-i="' + (i + 1) + '">' +
-        "<i>" + (i + 1) + "</i>" +
         '<span class="sr__label">' + FMT.esc(l.label) +
         '<span class="track"><u></u></span></span>' +
-        "<b>0</b></button>";
+        '<b><em class="fr">0</em> dari 10</b></button>';
     }).join("");
 
     if (m.choice) {
       rows += '<button type="button" class="sr" data-i="' + totalQ + '">' +
-        "<i>" + totalQ + "</i>" +
         '<span class="sr__label">Paling rela dikurangi<small></small>' +
         '<span class="track"><u></u></span></span>' +
-        "<b>0%</b></button>";
+        '<b><em class="pv">0</em>%</b></button>';
     }
 
     sec.innerHTML =
       '<div class="meta"><span>Ringkasan</span><span>' + totalQ + " pertanyaan</span></div>" +
       "<h2>" + FMT.esc(CFG.SUMMARY_HEADLINE || "Hasil sementara survei") + "</h2>" +
+      '<p class="note">Angka di kanan = dari 10 dosen yang memberi nilai 5 atau 6 · ' + m.n + " responden</p>" +
       '<div class="body">' +
         '<div class="L"><div class="big" data-n>0</div>' +
         '<p class="cap">responden telah mengisi survei ini</p></div>' +
@@ -363,7 +361,7 @@
       r.sr.forEach(function (row) {
         var u = row.querySelector("u");
         if (u) gsap.set(u, { width: "0%" });
-        var b = row.querySelector("b");
+        var b = row.querySelector("b em");
         if (b) { b.__num = { v: 0 }; b.textContent = "0"; }
       });
       gsap.fromTo(r.sr, { opacity: 0 }, { opacity: 1, duration: .45, stagger: .05, ease: "power2.out", overwrite: true });
@@ -376,8 +374,8 @@
       var row = r.sr[i];
       if (!row) return;
       var d = delay + i * .06;
-      setNum(row.querySelector("b"), l.mean, { instant: instant, fmt: fmtMean, duration: .9, delay: d });
-      sizeTo(row.querySelector("u"), "width", Math.max(1, (l.mean / l.max) * 100), { instant: instant, duration: .9, delay: d });
+      setNum(row.querySelector("b em"), l.top2 * 10, { instant: instant, duration: .9, delay: d });
+      sizeTo(row.querySelector("u"), "width", Math.max(1, l.top2 * 100), { instant: instant, duration: .9, delay: d });
     });
 
     if (m.choice) {
@@ -385,7 +383,7 @@
       var lead = m.choice.options[0];
       if (rowC && lead) {
         var dc = delay + m.likert.length * .06;
-        setNum(rowC.querySelector("b"), lead.share * 100, { instant: instant, fmt: fmtPct, duration: .9, delay: dc });
+        setNum(rowC.querySelector("b em"), lead.share * 100, { instant: instant, duration: .9, delay: dc });
         sizeTo(rowC.querySelector("u"), "width", lead.share * 100, { instant: instant, duration: .9, delay: dc });
         var small = rowC.querySelector("small");
         if (small) small.textContent = lead.label;
