@@ -131,6 +131,18 @@ h2{
 .cap strong{display:block;font-weight:400;font-size:1.9rem;line-height:1.1;letter-spacing:-.015em;color:var(--ink);margin-bottom:.3rem;max-width:none}
 .cap .lead{font-size:1.5rem;line-height:1.25;letter-spacing:-.01em;max-width:24ch}
 
+/* skor aspek + rentang kategori Likert */
+.gauge{width:100%;max-width:26rem}
+.gauge__track{position:relative;display:grid;height:.55rem;background:var(--grey-2)}
+.gauge__track span{background:var(--grey-2);border-left:1px solid var(--paper)}
+.gauge__track span:first-child{border-left:0}
+.gauge__track span.on{background:var(--accent)}
+.gauge__mark{position:absolute;top:-.4rem;bottom:-.4rem;left:0;width:2px;background:var(--ink);transform:translateX(-1px)}
+.gauge__ax{display:flex;justify-content:space-between;margin-top:.5rem;font-size:.66rem;letter-spacing:.06em;color:var(--grey-3)}
+.gauge__cap{margin:.5rem 0 0;font-size:.92rem;line-height:1.4;color:var(--grey-3)}
+.gauge__cap b{font-weight:500;color:var(--ink)}
+.gauge__cap .gr{color:var(--ink)}
+
 /* track */
 .track{display:block;height:.4rem;background:var(--grey-2);overflow:hidden}
 .track u{display:block;height:100%;width:0;background:var(--accent)}

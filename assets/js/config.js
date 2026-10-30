@@ -62,5 +62,16 @@ window.APP_CONFIG = {
      Ukuran huruf sudah otomatis mengikuti lebar & tinggi layar (dek selalu
      mengisi jendela tanpa terpotong). Bila di layar/proyektor Anda dek terasa
      terlalu besar, turunkan mis. 0.9; bila terasa terlalu kecil, naikkan 1.1. */
-  DISPLAY_SCALE: 1
+  DISPLAY_SCALE: 1,
+
+  /* 13. Kategori skala Likert.
+     Skor aspek = Σ semua jawaban ÷ (jumlah responden × nilai maksimum) × 100%.
+     Hasilnya dipetakan ke rentang di bawah (batas atas, dalam persen).        */
+  BANDS: [
+    { max: 20,  label: "Sangat tidak penting" },
+    { max: 40,  label: "Tidak penting" },
+    { max: 60,  label: "Cukup penting" },
+    { max: 80,  label: "Penting" },
+    { max: 100, label: "Sangat penting" }
+  ]
 };

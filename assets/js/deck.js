@@ -165,6 +165,9 @@
       total: total,
       mean: total ? weighted / total : 0,
       top2: total ? (dist[max - 1] + (dist[max - 2] || 0)) / total : 0,
+      topCount: total ? (dist[max - 1] || 0) + (dist[max - 2] || 0) : 0,
+      /* skor aspek: total bobot ÷ skor maksimum yang mungkin, dalam persen */
+      pct: total ? (weighted / (total * max)) * 100 : 0,
       maxDist: maxDist
     };
   }
@@ -246,6 +249,30 @@
     return { left: "Terendah", right: "Tertinggi", cap: "menilai tinggi" };
   }
 
+  /* Kategori skor Likert: 0–20–40–60–80–100 % dari skor maksimum. */
+  var BANDS = (CFG.BANDS && CFG.BANDS.length) ? CFG.BANDS : [
+    { max: 20, label: "Sangat tidak penting" },
+    { max: 40, label: "Tidak penting" },
+    { max: 60, label: "Cukup penting" },
+    { max: 80, label: "Penting" },
+    { max: 100, label: "Sangat penting" }
+  ];
+
+  function bandFor(pct) {
+    for (var i = 0; i < BANDS.length; i++) {
+      if (pct <= BANDS[i].max + 1e-6) {
+        return {
+          i: i,
+          label: BANDS[i].label,
+          from: i === 0 ? 0 : BANDS[i - 1].max,
+          to: BANDS[i].max
+        };
+      }
+    }
+    var last = BANDS[BANDS.length - 1];
+    return { i: BANDS.length - 1, label: last.label, from: BANDS[BANDS.length - 2] ? BANDS[BANDS.length - 2].max : 0, to: last.max };
+  }
+
   function summarySection(m) {
     var sec = document.createElement("section");
     var totalQ = m.likert.length + (m.choice ? 1 : 0);
@@ -291,21 +318,36 @@
     var ax = "";
     for (var a = 1; a <= l.max; a++) ax += "<i>" + a + "</i>";
 
+    var segs = "";
+    for (var b = 0; b < BANDS.length; b++) segs += "<span></span>";
+
     sec.innerHTML =
       '<div class="meta"><span>Pertanyaan ' + (i + 1) + " dari " + totalQ + "</span>" +
-      "<span>Skala 1 sampai " + l.max + "</span></div>" +
+      "<span>" + m.n + " responden · skala 1–" + l.max + "</span></div>" +
       "<h2>" + FMT.esc(l.q) + "</h2>" +
       '<div class="body">' +
-        '<div class="L"><div class="big"><b class="m">0</b><span>/' + l.max + "</span></div>" +
-        '<p class="cap"><strong class="t">0%</strong>' + ends.cap + "</p></div>" +
+        '<div class="L">' +
+          '<div class="big"><b class="fr">0</b><span> dari 10</span></div>' +
+          '<p class="cap">dosen memberi nilai ' + (l.max - 1) + "–" + l.max + "</p>" +
+          '<div class="gauge">' +
+            '<div class="gauge__track" style="grid-template-columns:repeat(' + BANDS.length + ',1fr)">' +
+              segs + '<i class="gauge__mark" style="left:0%"></i>' +
+            "</div>" +
+            '<div class="gauge__ax"><span>0%</span><span>100%</span></div>' +
+            '<p class="gauge__cap"><b class="gp">0%</b> dari skor maksimum · <span class="gr">—</span></p>' +
+          "</div>" +
+        "</div>" +
         '<div class="R"><div class="plot">' + cols + "</div>" +
         '<div class="ax">' + ax + "</div>" +
-        '<div class="ends"><span>' + ends.left + "</span><span>" + ends.right + "</span></div></div>" +
+        '<div class="ends"><span>1 = ' + ends.left + "</span><span>" + l.max + " = " + ends.right + "</span></div></div>" +
       "</div>";
 
     sec.__refs = {
-      m: $(".m", sec),
-      t: $(".t", sec),
+      fr: $(".fr", sec),
+      gp: $(".gp", sec),
+      gr: $(".gr", sec),
+      mark: $(".gauge__mark", sec),
+      segs: $$(".gauge__track span", sec),
       cols: $$(".col", sec),
       bars: $$(".bar", sec),
       ems: $$(".bar em", sec)
@@ -388,21 +430,28 @@
     var r = sec.__refs;
     var instant = mode === "instant";
     var replay = mode === "replay" && canAnimate();
+    var band = bandFor(l.pct);
 
     if (replay) {
-      if (r.m.__tw) { r.m.__tw.kill(); r.m.__tw = null; }
-      r.m.__num = { v: 0 }; r.m.textContent = "0";
-      if (r.t.__tw) { r.t.__tw.kill(); r.t.__tw = null; }
-      r.t.__num = { v: 0 }; r.t.textContent = "0%";
+      if (r.fr.__tw) { r.fr.__tw.kill(); r.fr.__tw = null; }
+      r.fr.__num = { v: 0 }; r.fr.textContent = "0";
+      if (r.gp.__tw) { r.gp.__tw.kill(); r.gp.__tw = null; }
+      r.gp.__num = { v: 0 }; r.gp.textContent = "0%";
       r.ems.forEach(function (e) {
         if (e.__tw) { e.__tw.kill(); e.__tw = null; }
         e.__num = { v: 0 }; e.textContent = "0";
       });
       r.bars.forEach(function (b) { gsap.set(b, { height: "0%" }); });
+      gsap.set(r.mark, { left: "0%" });
     }
 
-    setNum(r.m, l.mean, { instant: instant, fmt: fmtMean, duration: 1, delay: replay ? .04 : 0 });
-    setNum(r.t, l.top2 * 100, { instant: instant, fmt: fmtPct, duration: 1, delay: replay ? .1 : 0 });
+    /* angka besar: berapa dari 10 dosen yang memilih nilai tertinggi */
+    setNum(r.fr, l.top2 * 10, { instant: instant, duration: 1, delay: replay ? .04 : 0 });
+    /* skor aspek + kategorinya */
+    setNum(r.gp, l.pct, { instant: instant, fmt: fmtPct, duration: 1, delay: replay ? .12 : 0 });
+    r.gr.textContent = band.label + " (" + band.from + "–" + band.to + "%)";
+    r.segs.forEach(function (s, k) { s.classList.toggle("on", k === band.i); });
+    sizeTo(r.mark, "left", Math.min(100, Math.max(0, l.pct)), { instant: instant, duration: .95, delay: replay ? .2 : 0 });
 
     r.cols.forEach(function (col, k) {
       var v = l.dist[k] || 0;
@@ -589,6 +638,14 @@
   }
 
   /* ---------------------------------------------------------------- DATA --- */
+  /* Tautan langsung: index.html#4 membuka slide ke-4. */
+  function jumpToHash() {
+    var m = /^#(\d+)$/.exec(location.hash || "");
+    if (!m) return;
+    var i = parseInt(m[1], 10) - 1;
+    if (i > 0) show(i);
+  }
+
   function sameChoice(a, b) {
     if (!a && !b) return true;
     if (!a || !b) return false;
@@ -641,6 +698,7 @@
       buildDeck();
       renderAll("instant");
       show(0);
+      jumpToHash();
       hideBanner();
     }).catch(function (err) {
       showBanner("Gagal memuat data. Periksa API_URL di config.js, lalu coba lagi.");
@@ -718,6 +776,8 @@
 
     var retry = $("#bannerRetry");
     if (retry) retry.addEventListener("click", function () { loadInitial(); });
+
+    window.addEventListener("hashchange", jumpToHash);
 
     document.addEventListener("visibilitychange", function () {
       if (!document.hidden) API.check().catch(function () {});
