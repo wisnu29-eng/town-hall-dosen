@@ -164,6 +164,9 @@
       total: total,
       mean: total ? weighted / total : 0,
       top2: total ? (dist[max - 1] + (dist[max - 2] || 0)) / total : 0,
+      /* nilai yang paling banyak dipilih → yang kedua → dst. */
+      ranked: dist.map(function (c, idx) { return { v: idx + 1, c: c }; })
+        .sort(function (a, b) { return b.c - a.c || b.v - a.v; }),
       maxDist: maxDist
     };
   }
@@ -297,11 +300,11 @@
       "<h2>" + FMT.esc(l.q) + "</h2>" +
       '<div class="body">' +
         '<div class="L">' +
-          '<div class="big"><b class="fr">0</b><span> dari 10</span></div>' +
-          '<p class="cap">dosen memberi nilai ' + (l.max - 1) + "–" + l.max + "</p>" +
+          '<div class="big"><b class="fr">0</b><span class="of"> dari ' + m.n + "</span></div>" +
+          '<p class="cap"><span class="cl">dosen memilih angka —</span></p>' +
           '<div class="split">' +
-            "<p><b class=\"sp\">0%</b><span>dosen menilai " + (l.max - 1) + "</span><i class=\"sn\">0 dari " + m.n + "</i></p>" +
-            "<p><b class=\"sp\">0%</b><span>dosen menilai " + l.max + "</span><i class=\"sn\">0 dari " + m.n + "</i></p>" +
+            "<p><b class=\"sp\">0%</b><span class=\"sl\">dosen menilai —</span><i class=\"sn\">0 dari " + m.n + "</i></p>" +
+            "<p><b class=\"sp\">0%</b><span class=\"sl\">dosen menilai —</span><i class=\"sn\">0 dari " + m.n + "</i></p>" +
           "</div>" +
         "</div>" +
         '<div class="R"><div class="plot">' + cols + "</div>" +
@@ -309,9 +312,13 @@
         '<div class="ends"><span>1 = ' + ends.left + "</span><span>" + l.max + " = " + ends.right + "</span></div></div>" +
       "</div>";
 
+    sec.__ends = ends;
     sec.__refs = {
       fr: $(".fr", sec),
+      of: $(".of", sec),
+      cl: $(".cl", sec),
       sp: $$(".split .sp", sec),
+      sl: $$(".split .sl", sec),
       sn: $$(".split .sn", sec),
       cols: $$(".col", sec),
       bars: $$(".bar", sec),
@@ -395,8 +402,9 @@
     var r = sec.__refs;
     var instant = mode === "instant";
     var replay = mode === "replay" && canAnimate();
-    var cLo = l.dist[l.max - 2] || 0;
-    var cHi = l.dist[l.max - 1] || 0;
+    var ends = sec.__ends || scaleEnds(l.q);
+    var first = l.ranked[0] || { v: l.max, c: 0 };
+    var second = l.ranked[1] || first;
 
     if (replay) {
       if (r.fr.__tw) { r.fr.__tw.kill(); r.fr.__tw = null; }
@@ -412,15 +420,21 @@
       r.bars.forEach(function (b) { gsap.set(b, { height: "0%" }); });
     }
 
-    /* angka besar: berapa dari 10 dosen yang memilih dua nilai tertinggi */
-    setNum(r.fr, l.top2 * 10, { instant: instant, duration: 1, delay: replay ? .04 : 0 });
+    /* angka besar: jumlah dosen yang memilih nilai terbanyak */
+    setNum(r.fr, first.c, { instant: instant, duration: 1, delay: replay ? .04 : 0 });
+    if (r.of) r.of.textContent = " dari " + l.total;
+    if (r.cl) {
+      r.cl.textContent = "dosen memilih angka " + first.v +
+        (first.v === l.max ? " (" + ends.right + ")" : "");
+    }
 
-    /* rincian dua nilai tertinggi */
+    /* rincian dua nilai yang paling banyak dipilih */
     var d = replay ? .12 : 0;
-    setNum(r.sp[0], l.total ? (cLo / l.total) * 100 : 0, { instant: instant, fmt: fmtPct, duration: .9, delay: d });
-    setNum(r.sp[1], l.total ? (cHi / l.total) * 100 : 0, { instant: instant, fmt: fmtPct, duration: .9, delay: d + .06 });
-    if (r.sn[0]) r.sn[0].textContent = cLo + " dari " + l.total;
-    if (r.sn[1]) r.sn[1].textContent = cHi + " dari " + l.total;
+    [first, second].forEach(function (o, i) {
+      setNum(r.sp[i], l.total ? (o.c / l.total) * 100 : 0, { instant: instant, fmt: fmtPct, duration: .9, delay: d + i * .06 });
+      if (r.sl[i]) r.sl[i].textContent = "dosen menilai " + o.v;
+      if (r.sn[i]) r.sn[i].textContent = o.c + " dari " + l.total;
+    });
 
     r.cols.forEach(function (col, k) {
       var v = l.dist[k] || 0;

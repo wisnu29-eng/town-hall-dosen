@@ -115,7 +115,7 @@ h2{
 }
 .note{margin:.7rem 0 0;font-size:.92rem;line-height:1.4;color:var(--grey-3)}
 .body{flex:1;min-height:0;display:grid;grid-template-columns:5fr 6fr;gap:3.6rem;padding-top:2rem}
-.L{display:flex;flex-direction:column;justify-content:center;gap:1.3rem;min-width:0;container-type:inline-size}
+.L{display:flex;flex-direction:column;justify-content:center;gap:1.3rem;min-width:0;container-type:inline-size;padding-bottom:7vh}
 .R{display:flex;flex-direction:column;min-height:0;min-width:0}
 
 .big{
@@ -123,10 +123,10 @@ h2{
   color:var(--accent);white-space:nowrap;
 }
 @supports (container-type:inline-size){
-  .big{font-size:min(9.4rem, 46cqw)}
+  .big{font-size:min(9.4rem, 42cqw)}
 }
 .big b{font-weight:300;font-size:inherit;letter-spacing:inherit}
-.big span{font-size:2.7rem;letter-spacing:-.02em;color:var(--grey-3);margin-left:.45rem}
+.big span{font-size:.28em;letter-spacing:-.02em;color:var(--grey-3);margin-left:.45rem}
 
 .cap{margin:0;font-size:1.18rem;line-height:1.35;color:var(--grey-3);max-width:24ch}
 .cap strong{display:block;font-weight:400;font-size:1.9rem;line-height:1.1;letter-spacing:-.015em;color:var(--ink);margin-bottom:.3rem;max-width:none}
