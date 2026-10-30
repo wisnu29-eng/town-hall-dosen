@@ -17,8 +17,9 @@ window.APP_CONFIG = {
   /* 3. Mode demo. `null` = otomatis aktif bila API_URL kosong.               */
   MOCK: null,
 
-  /* 4. Cek data baru tiap X ms (8000–15000 disarankan).                      */
-  POLL_MS: 8000,
+  /* 4. Cek data baru tiap X ms. 2000 = hampir langsung, tapi lebih banyak
+     permintaan ke Apps Script. Naikkan ke 5000–8000 bila pengunjung ramai.    */
+  POLL_MS: 2000,
 
   /* 5. Paksa ambil ulang penuh tiap X ms walau versi tidak berubah.          */
   FULL_REFRESH_MS: 300000,

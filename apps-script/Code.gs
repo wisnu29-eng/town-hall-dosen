@@ -16,7 +16,8 @@
  */
 
 var SHEET_NAME = "";          // kosong = tab pertama
-var CACHE_SECONDS = 20;       // cache singkat agar Sheet tidak dibaca tiap detik
+var CACHE_SECONDS = 20;       // cache data penuh (dikunci per versi)
+var PING_SECONDS = 1;         // cache jawaban "ping" — makin kecil makin responsif
 var MAX_ROWS = 5000;          // batas jumlah baris yang dikirim
 
 /* ------------------------------------------------------------------ ROUTER */
@@ -68,7 +69,7 @@ function ping_() {
     count: Math.max(0, sh.getLastRow() - 1),
     updatedAt: new Date().toISOString()
   };
-  try { cache.put(key, JSON.stringify(out), 5); } catch (ignore) { /* abaikan */ }
+  try { cache.put(key, JSON.stringify(out), PING_SECONDS); } catch (ignore) { /* abaikan */ }
   return out;
 }
 

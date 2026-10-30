@@ -86,17 +86,19 @@ File `.nojekyll` sudah disertakan agar folder `assets/` tidak diproses Jekyll.
 | Langkah | Yang terjadi |
 |---|---|
 | Halaman dibuka | `GET /exec` → JSON lengkap (kolom, tipe, baris) |
-| Tiap 10 detik | `GET /exec?action=ping` → hanya versi + jumlah baris |
+| Tiap 2 detik | `GET /exec?action=ping` → hanya versi + jumlah baris |
 | Versi berubah | Ambil data lengkap, lalu angka & batang bertween ke nilai baru |
-| Form terkirim | Trigger `onFormSubmit` menaikkan versi → semua klien tahu |
+| Form terkirim | Baris baru masuk → versi berubah (trigger `onFormSubmit` mempercepat) |
 
 Versi = nomor bump + jumlah baris + hash baris terakhir, sehingga perubahan isi
-sel juga terdeteksi. Data di-cache 20 detik di server (`CACHE_SECONDS`) agar Sheet
-tidak dibaca pada setiap polling.
+sel juga terdeteksi. Jawaban ping di-cache 1 detik (`PING_SECONDS`) dan data
+lengkap 20 detik (`CACHE_SECONDS`); cache data dikunci per versi, jadi data baru
+tidak pernah disajikan dari cache lama.
 
-**Latensi normal: 10–30 detik** setelah kiriman masuk. Ingin lebih cepat?
-Turunkan `CACHE_SECONDS` (mis. 5) dan `POLL_MS` (mis. 5000) — konsekuensinya kuota
-Apps Script lebih cepat terpakai.
+**Latensi normal: 2–4 detik** setelah kiriman masuk. Untuk lebih cepat lagi,
+turunkan `POLL_MS` ke 1000 — tapi permintaan ke Apps Script ikut berlipat.
+Kalau yang membuka halaman banyak (mis. 20+ orang bersamaan), naikkan `POLL_MS`
+ke 5000–8000 agar kuota Apps Script tidak cepat habis.
 
 ---
 
