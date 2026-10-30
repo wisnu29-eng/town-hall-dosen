@@ -323,7 +323,7 @@
       '<div class="body">' +
         '<div class="L">' +
           '<div class="big"><b class="fr">0</b><span class="of"> dari ' + m.n + "</span></div>" +
-          '<p class="cap"><span class="cl">dosen memilih angka —</span></p>' +
+          '<p class="cap cap--wide"><span class="cl">dosen memilih angka —</span></p>' +
           '<div class="split">' +
             "<p><b class=\"sp\">0%</b><span class=\"sl\">dosen menilai —</span><i class=\"sn\">0 dari " + m.n + "</i></p>" +
             "<p><b class=\"sp\">0%</b><span class=\"sl\">dosen menilai —</span><i class=\"sn\">0 dari " + m.n + "</i></p>" +

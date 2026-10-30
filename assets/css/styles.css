@@ -129,6 +129,7 @@ h2{
 .big span{font-size:.28em;letter-spacing:-.02em;color:var(--grey-3);margin-left:.45rem}
 
 .cap{margin:0;font-size:1.18rem;line-height:1.35;color:var(--grey-3);max-width:24ch}
+.cap--wide{max-width:none;white-space:nowrap}
 .cap strong{display:block;font-weight:400;font-size:1.9rem;line-height:1.1;letter-spacing:-.015em;color:var(--ink);margin-bottom:.3rem;max-width:none}
 .cap .lead{font-size:1.5rem;line-height:1.25;letter-spacing:-.01em;max-width:24ch}
 .cap .lv{font-weight:600}
