@@ -175,8 +175,8 @@ h2{
 /* sebaran jawaban 1..N */
 .spark{display:flex;flex-direction:column;justify-content:center;gap:.26rem;min-width:0}
 .spark i{display:flex;align-items:center;gap:.4rem;height:.72rem;font-style:normal}
-.spark .b{flex:1;height:100%;min-width:0;display:block}
-.spark u{display:block;height:100%;width:0;background:var(--grey-2)}
+.spark .b{flex:1;height:100%;min-width:0;display:flex;justify-content:flex-end}
+.spark u{display:block;height:100%;width:0;flex:none;background:var(--grey-2)}
 .spark i.on u{background:var(--accent)}
 .spark b{width:.9rem;flex:none;font-weight:400;font-size:.68rem;line-height:1;color:var(--grey-3);text-align:left}
 
