@@ -325,8 +325,8 @@
           '<div class="big"><b class="fr">0</b><span class="of"> dari ' + m.n + "</span></div>" +
           '<p class="cap cap--wide"><span class="cl">dosen memilih angka —</span></p>' +
           '<div class="split">' +
-            '<p><i class="sb"></i><b class="sp">0%</b><span class="sl">dosen menilai —</span><i class="sn">0 dari ' + m.n + "</i></p>" +
-            '<p><i class="sb"></i><b class="sp">0%</b><span class="sl">dosen menilai —</span><i class="sn">0 dari ' + m.n + "</i></p>" +
+            '<p><b class="sp">0%</b><span class="sl">dosen menilai —</span><i class="sn">0 dari ' + m.n + "</i></p>" +
+            '<p><b class="sp">0%</b><span class="sl">dosen menilai —</span><i class="sn">0 dari ' + m.n + "</i></p>" +
           "</div>" +
         "</div>" +
         '<div class="R"><div class="plot">' + cols + "</div>" +
@@ -342,7 +342,6 @@
       sp: $$(".split .sp", sec),
       sl: $$(".split .sl", sec),
       sn: $$(".split .sn", sec),
-      sb: $$(".split .sb", sec),
       cols: $$(".col", sec),
       bars: $$(".bar", sec),
       ems: $$(".bar em", sec)
@@ -446,7 +445,6 @@
         if (el.__tw) { el.__tw.kill(); el.__tw = null; }
         el.__num = { v: 0 }; el.textContent = "0%";
       });
-      r.sb.forEach(function (el) { gsap.set(el, { width: "0%" }); });
       r.ems.forEach(function (e) {
         if (e.__tw) { e.__tw.kill(); e.__tw = null; }
         e.__num = { v: 0 }; e.textContent = "0";
@@ -467,7 +465,6 @@
     [first, second].forEach(function (o, i) {
       var pct = l.total ? (o.c / l.total) * 100 : 0;
       setNum(r.sp[i], pct, { instant: instant, fmt: fmtPct, duration: .9, delay: d + i * .06 });
-      sizeTo(r.sb[i], "width", pct, { instant: instant, duration: .9, delay: d + i * .06 });
       if (r.sl[i]) r.sl[i].textContent = "dosen menilai " + o.v;
       if (r.sn[i]) r.sn[i].textContent = o.c + " dari " + l.total;
     });
