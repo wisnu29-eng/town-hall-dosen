@@ -113,7 +113,6 @@ h2{
   margin:1.6rem 0 0;font-weight:400;font-size:2.15rem;line-height:1.2;
   letter-spacing:-.022em;max-width:44ch;
 }
-.note{margin:.7rem 0 0;font-size:.92rem;line-height:1.4;color:var(--grey-3)}
 .body{flex:1;min-height:0;display:grid;grid-template-columns:5fr 6fr;gap:3.6rem;padding-top:2rem}
 .L{display:flex;flex-direction:column;justify-content:center;gap:1.3rem;min-width:0;container-type:inline-size;padding-bottom:7vh}
 .R{display:flex;flex-direction:column;min-height:0;min-width:0}

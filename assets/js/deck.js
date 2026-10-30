@@ -279,7 +279,6 @@
     sec.innerHTML =
       '<div class="meta"><span>Ringkasan</span><span>' + totalQ + " pertanyaan · " + m.n + " responden</span></div>" +
       "<h2>" + FMT.esc(CFG.SUMMARY_HEADLINE || "Hasil sementara survei") + "</h2>" +
-      '<p class="note">Batang = sebaran jawaban nilai 1–6 · angka besar = jumlah dosen pada nilai terbanyak</p>' +
       '<div class="cards">' + cards + "</div>" +
       pick;
 
