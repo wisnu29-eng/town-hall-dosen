@@ -115,29 +115,29 @@ h2{
 }
 .note{margin:.7rem 0 0;font-size:.92rem;line-height:1.4;color:var(--grey-3)}
 .body{flex:1;min-height:0;display:grid;grid-template-columns:5fr 6fr;gap:3.6rem;padding-top:2rem}
-.L{display:flex;flex-direction:column;justify-content:flex-end;gap:1.1rem;min-width:0;container-type:inline-size}
+.L{display:flex;flex-direction:column;justify-content:center;gap:1.3rem;min-width:0;container-type:inline-size}
 .R{display:flex;flex-direction:column;min-height:0;min-width:0}
 
 .big{
-  font-weight:300;font-size:8.6rem;line-height:.86;letter-spacing:-.055em;
+  font-weight:300;font-size:9.4rem;line-height:.86;letter-spacing:-.055em;
   color:var(--accent);white-space:nowrap;
 }
 @supports (container-type:inline-size){
-  .big{font-size:min(8.6rem, 44cqw)}
+  .big{font-size:min(9.4rem, 46cqw)}
 }
 .big b{font-weight:300;font-size:inherit;letter-spacing:inherit}
-.big span{font-size:2.4rem;letter-spacing:-.02em;color:var(--grey-3);margin-left:.45rem}
+.big span{font-size:2.7rem;letter-spacing:-.02em;color:var(--grey-3);margin-left:.45rem}
 
-.cap{margin:0;font-size:1.05rem;line-height:1.35;color:var(--grey-3);max-width:22ch}
+.cap{margin:0;font-size:1.18rem;line-height:1.35;color:var(--grey-3);max-width:24ch}
 .cap strong{display:block;font-weight:400;font-size:1.9rem;line-height:1.1;letter-spacing:-.015em;color:var(--ink);margin-bottom:.3rem;max-width:none}
 .cap .lead{font-size:1.5rem;line-height:1.25;letter-spacing:-.01em;max-width:24ch}
 
 /* rincian dua nilai tertinggi */
-.split{margin-top:.2rem;width:100%;max-width:26rem;border-top:1px solid var(--line)}
-.split p{margin:0;display:grid;grid-template-columns:3.8rem 1fr auto;align-items:baseline;gap:.55rem;padding:.6rem 0;border-bottom:1px solid var(--line)}
-.split b{font-weight:300;font-size:1.5rem;line-height:1;letter-spacing:-.02em}
-.split span{font-size:.95rem;color:var(--grey-3)}
-.split i{font-style:normal;font-size:.82rem;color:var(--grey-3);white-space:nowrap}
+.split{margin-top:.2rem;width:100%;max-width:28rem;border-top:1px solid var(--line)}
+.split p{margin:0;display:grid;grid-template-columns:4.2rem 1fr auto;align-items:baseline;gap:.55rem;padding:.68rem 0;border-bottom:1px solid var(--line)}
+.split b{font-weight:300;font-size:1.7rem;line-height:1;letter-spacing:-.02em}
+.split span{font-size:1.05rem;color:var(--grey-3)}
+.split i{font-style:normal;font-size:.9rem;color:var(--grey-3);white-space:nowrap}
 
 /* track */
 .track{display:block;height:.4rem;background:var(--grey-2);overflow:hidden}
