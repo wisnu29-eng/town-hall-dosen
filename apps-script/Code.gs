@@ -1,398 +1,263 @@
 /**
- * ============================================================================
- *  LIVE SHEET DASHBOARD — API untuk GitHub Pages
- * ----------------------------------------------------------------------------
- *  Membaca Google Sheet (hasil Google Form) dan menyajikannya sebagai JSON
- *  lewat Web App. Mendukung JSONP agar bisa dipanggil dari GitHub Pages
- *  tanpa masalah CORS.
+ * BACKEND — Google Apps Script
+ * ---------------------------------------------------------------------------
+ * Menyajikan isi Google Sheet sebagai JSON (JSONP) untuk halaman statis
+ * di GitHub Pages, tanpa masalah CORS.
  *
- *  CARA PASANG
- *  1. Buka spreadsheet respons form Anda.
- *  2. Extensions > Apps Script.
- *  3. Hapus isi Code.gs, tempel file ini, Save.
- *  4. (Opsional) Isi CONFIG.SHEET_NAME bila bukan sheet pertama.
- *  5. Deploy > New deployment > Web app
- *       - Description : dashboard
- *       - Execute as  : Me
- *       - Who has access : Anyone
- *     Klik Deploy, lalu salin URL yang berakhiran /exec.
- *  6. Tempel URL itu ke assets/js/config.js -> API_URL.
- *  7. Jalankan `installTriggers` sekali (via menu Dashboard di spreadsheet
- *     atau tombol Run di editor) agar data baru langsung terdeteksi.
- * ============================================================================
+ * LANGKAH PASANG
+ * 1. Buka Sheet → Extensions → Apps Script.
+ * 2. Hapus isi Code.gs, tempel file ini. Isi SHEET_NAME bila perlu.
+ * 3. Deploy → New deployment → Web app
+ *      Execute as        : Me
+ *      Who has access    : Anyone
+ * 4. Salin URL yang berakhiran /exec ke API_URL di assets/js/config.js.
+ * 5. Jalankan installTriggers() sekali agar data langsung ter-update
+ *    setiap ada kiriman form baru (atau pakai menu "Dashboard").
  */
 
-// ---------------------------------------------------------------- KONFIGURASI
-var CONFIG = {
-  // Kosongkan bila script ini terikat (container-bound) pada spreadsheet.
-  SPREADSHEET_ID: '',
+var SHEET_NAME = "";          // kosong = tab pertama
+var CACHE_SECONDS = 20;       // cache singkat agar Sheet tidak dibaca tiap detik
+var MAX_ROWS = 5000;          // batas jumlah baris yang dikirim
 
-  // Nama tab sheet. Kosongkan = sheet pertama.
-  SHEET_NAME: '',
+/* ------------------------------------------------------------------ ROUTER */
 
-  // Zona waktu untuk interpretasi tanggal.
-  TIMEZONE: 'Asia/Jakarta',
-
-  // Lama cache data (detik). 15–30 detik sudah terasa "instan".
-  CACHE_SECONDS: 20,
-
-  // Lama cache "sidik jari" sheet (detik) — dipakai endpoint ping.
-  SIG_SECONDS: 8,
-
-  // Batas jumlah baris yang dibaca (jaga kuota & ukuran respons).
-  MAX_ROWS: 20000,
-
-  // Ukuran potongan cache (limit Apps Script 100KB per key).
-  MAX_CHUNK: 90000,
-
-  // Nama properti penyimpan versi.
-  PROP_VERSION: 'DASHBOARD_VERSION'
-};
-
-// ------------------------------------------------------------------- ROUTER
 function doGet(e) {
-  var params = (e && e.parameter) || {};
-  var callback = params.callback || '';
-  var payload;
+  var p = (e && e.parameter) || {};
+  var callback = p.callback || "";
+  var action = p.action || "data";
 
+  var out;
   try {
-    if (params.action === 'ping') {
-      payload = ping_();
-    } else {
-      payload = data_(params.fresh === '1');
-    }
-    payload.ok = true;
+    out = action === "ping" ? ping_() : data_(!!p.fresh);
   } catch (err) {
-    payload = { ok: false, error: String((err && err.message) || err) };
+    out = { ok: false, error: String((err && err.message) || err) };
   }
-
-  var body = JSON.stringify(payload);
-
-  if (callback && /^[A-Za-z_$][\w$]*(\.[\w$]*)*$/.test(callback)) {
-    return ContentService
-      .createTextOutput(callback + '(' + body + ');')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-
-  return ContentService
-    .createTextOutput(body)
-    .setMimeType(ContentService.MimeType.JSON);
+  return reply_(out, callback);
 }
 
-// POST boleh dipakai untuk webhook / alat lain.
 function doPost(e) {
   return doGet(e);
 }
 
-// --------------------------------------------------------------------- PING
-/**
- * Balasan super ringan: hanya versi data.
- * Klien memanggil ini tiap ~10 detik, lalu mengambil data penuh
- * hanya bila versinya berubah.
- */
-function ping_() {
-  var sheet = getSheet_();
-  var sig = signature_(sheet);
-  return {
-    ok: true,
-    v: version_() + ':' + sig,
-    sheet: sheet.getName(),
-    count: Math.max(0, sheet.getLastRow() - 1),
-    updatedAt: new Date().toISOString()
-  };
+function reply_(obj, callback) {
+  var json = JSON.stringify(obj);
+  if (callback) {
+    return ContentService.createTextOutput(callback + "(" + json + ");")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(json)
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
-// --------------------------------------------------------------------- DATA
-function data_(fresh) {
-  var sheet = getSheet_();
-  var sig = signature_(sheet);
-  var version = version_() + ':' + sig;
+/* ------------------------------------------------------------------- DATA */
+
+function ping_() {
   var cache = CacheService.getScriptCache();
-  var key = 'dsb_' + hash_(sheet.getName() + '|' + version);
+  var sh = sheet_();
+  var key = "p_" + hash_(sh.getName());
+
+  var hit = cache.get(key);
+  if (hit) {
+    try { return JSON.parse(hit); } catch (ignore) { /* bangun ulang */ }
+  }
+
+  var out = {
+    ok: true,
+    v: version_(sh),
+    sheet: sh.getName(),
+    count: Math.max(0, sh.getLastRow() - 1),
+    updatedAt: new Date().toISOString()
+  };
+  try { cache.put(key, JSON.stringify(out), 5); } catch (ignore) { /* abaikan */ }
+  return out;
+}
+
+function data_(fresh) {
+  var sh = sheet_();
+  var v = version_(sh);
+  var cache = CacheService.getScriptCache();
+  var key = "d_" + hash_(sh.getName() + "|" + v);
 
   if (!fresh) {
-    var metaRaw = cache.get(key + '_m');
-    if (metaRaw) {
+    var hit = readChunks_(cache, key);
+    if (hit) {
       try {
-        var meta = JSON.parse(metaRaw);
-        var joined = readChunks_(cache, key, meta.n);
-        if (joined) {
-          var cached = JSON.parse(joined);
-          cached.cached = true;
-          return cached;
-        }
-      } catch (ignore) { /* cache rusak -> bangun ulang */ }
+        var parsed = JSON.parse(hit);
+        parsed.cached = true;
+        return parsed;
+      } catch (ignore) { /* cache rusak, bangun ulang */ }
     }
   }
 
-  var payload = build_(sheet);
-  payload.v = version;
-  writeChunks_(cache, key, JSON.stringify(payload));
+  var payload = build_(sh, v);
+  try {
+    writeChunks_(cache, key, JSON.stringify(payload), CACHE_SECONDS);
+  } catch (ignore) { /* cache penuh bukan masalah */ }
   return payload;
 }
 
-// -------------------------------------------------------------------- BUILD
-function build_(sheet) {
-  var lastRow = sheet.getLastRow();
-  var lastCol = sheet.getLastColumn();
+function build_(sh, v) {
+  var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  var base = {
+    ok: true,
+    v: v,
+    sheet: sh.getName(),
+    columns: [],
+    types: [],
+    count: 0,
+    rows: [],
+    updatedAt: new Date().toISOString()
+  };
+  if (lastRow < 2 || lastCol < 1) return base;
 
-  if (lastRow < 1 || lastCol < 1) {
-    return {
-      ok: true, v: '0', updatedAt: new Date().toISOString(),
-      sheet: sheet.getName(), columns: [], types: [], count: 0, rows: []
-    };
-  }
+  var height = Math.min(lastRow, MAX_ROWS + 1);
+  var values = sh.getRange(1, 1, height, lastCol).getValues();
 
-  var rowLimit = Math.min(lastRow, CONFIG.MAX_ROWS);
-  var values = sheet.getRange(1, 1, rowLimit, lastCol).getValues();
+  var header = values.shift();
+  base.columns = header.map(function (h, i) {
+    var name = String(h || "").trim();
+    return name || ("Kolom " + (i + 1));
+  });
+  base.types = base.columns.map(function (_, i) { return typeOf_(values, i); });
 
-  var headers = (values.shift() || []).map(function (h, i) {
-    var name = String(h == null ? '' : h).trim();
-    return name || ('Kolom ' + (i + 1));
+  var rows = values.filter(function (r) {
+    return r.some(function (c) { return c !== "" && c !== null && c !== undefined; });
   });
 
-  var rows = [];
-  for (var r = 0; r < values.length; r++) {
-    var row = values[r];
-    var out = new Array(lastCol);
-    var filled = false;
-    for (var c = 0; c < lastCol; c++) {
-      var v = row[c];
-      if (v instanceof Date) {
-        out[c] = v.toISOString();
-        filled = true;
-      } else if (typeof v === 'number') {
-        out[c] = isFinite(v) ? Math.round(v * 10000) / 10000 : null;
-        filled = true;
-      } else if (v === null || v === undefined || v === '') {
-        out[c] = '';
-      } else {
-        out[c] = String(v).slice(0, 800);
-        filled = true;
-      }
+  base.count = rows.length;
+  base.rows = serialise_(rows);
+  return base;
+}
+
+function serialise_(rows) {
+  return rows.map(function (row) {
+    return row.map(function (cell) {
+      if (cell instanceof Date) return cell.toISOString();
+      if (typeof cell === "number" && isFinite(cell)) return cell;
+      if (cell === null || cell === undefined) return "";
+      return String(cell);
+    });
+  });
+}
+
+function typeOf_(rows, i) {
+  var num = 0, date = 0, text = 0;
+  for (var r = 0; r < rows.length; r++) {
+    var v = rows[r][i];
+    if (v === "" || v === null || v === undefined) continue;
+    if (v instanceof Date) date++;
+    else if (typeof v === "number") num++;
+    else text++;
+  }
+  if (date && !num && !text) return "datetime";
+  if (num && !text) return "number";
+  return "string";
+}
+
+/* ------------------------------------------------------------------ VERSI */
+
+function version_(sh) {
+  var bump = PropertiesService.getScriptProperties().getProperty("v") || "0";
+  var lastRow = sh.getLastRow();
+  var sig = "";
+  if (lastRow >= 2) {
+    var row = sh.getRange(lastRow, 1, 1, sh.getLastColumn()).getDisplayValues()[0].join("|");
+    sig = hash_(row);
+  }
+  return bump + "-" + lastRow + "-" + sig;
+}
+
+function hash_(s) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, String(s));
+  var out = "";
+  for (var i = 0; i < bytes.length; i++) {
+    var b = (bytes[i] + 256) % 256;
+    out += (b < 16 ? "0" : "") + b.toString(16);
+  }
+  return out.slice(0, 12);
+}
+
+function bump_() {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty("v", String(Number(props.getProperty("v") || 0) + 1));
+}
+
+/* ------------------------------------------------------------------ CACHE */
+
+function writeChunks_(cache, key, value, seconds) {
+  var size = 90000;
+  var n = Math.ceil(value.length / size);
+  if (n <= 1) {
+    cache.put(key, value, seconds);
+    return;
+  }
+  var map = {};
+  for (var i = 0; i < n; i++) map[key + "_" + i] = value.substr(i * size, size);
+  map[key + "_n"] = String(n);
+  cache.putAll(map, seconds);
+}
+
+function readChunks_(cache, key) {
+  var n = cache.get(key + "_n");
+  if (n) {
+    var keys = [];
+    for (var i = 0; i < Number(n); i++) keys.push(key + "_" + i);
+    var all = cache.getAll(keys);
+    var out = "";
+    for (var k = 0; k < keys.length; k++) {
+      var part = all[keys[k]];
+      if (part == null) return null;
+      out += part;
     }
-    if (filled) rows.push(out);
+    return out;
   }
-
-  return {
-    ok: true,
-    v: '0',
-    updatedAt: new Date().toISOString(),
-    sheet: sheet.getName(),
-    columns: headers,
-    types: inferTypes_(rows, headers.length),
-    count: rows.length,
-    rows: rows
-  };
+  return cache.get(key);
 }
 
-/** Tebak tipe tiap kolom dari 150 baris pertama. */
-function inferTypes_(rows, width) {
-  var sample = Math.min(rows.length, 150);
-  var types = [];
+/* ------------------------------------------------------------------ SHEET */
 
-  for (var c = 0; c < width; c++) {
-    var dates = 0, numbers = 0, filled = 0;
-    for (var r = 0; r < sample; r++) {
-      var v = rows[r][c];
-      if (v === '' || v === null) continue;
-      filled++;
-      if (typeof v === 'number') numbers++;
-      else if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) dates++;
-    }
-    if (!filled) { types.push('string'); continue; }
-    if (dates / filled > 0.7) types.push('datetime');
-    else if (numbers / filled > 0.7) types.push('number');
-    else types.push('string');
+function sheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    var id = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID");
+    if (!id) throw new Error("Script tidak terikat ke spreadsheet. Isi SPREADSHEET_ID.");
+    ss = SpreadsheetApp.openById(id);
   }
-  return types;
-}
-
-// ------------------------------------------------------------- CACHE HELPERS
-function readChunks_(cache, key, count) {
-  if (!count) return '';
-  var keys = [];
-  for (var i = 0; i < count; i++) keys.push(key + '_' + i);
-  var found = cache.getAll(keys);
-  var parts = [];
-  for (var j = 0; j < count; j++) {
-    var part = found[key + '_' + j];
-    if (part == null) return '';
-    parts.push(part);
-  }
-  return parts.join('');
-}
-
-function writeChunks_(cache, key, json) {
-  try {
-    var chunks = [];
-    for (var i = 0; i < json.length; i += CONFIG.MAX_CHUNK) {
-      chunks.push(json.slice(i, i + CONFIG.MAX_CHUNK));
-    }
-    // CacheService membatasi jumlah key per pemanggilan; kirim per 50.
-    for (var s = 0; s < chunks.length; s += 50) {
-      var batch = {};
-      for (var k = s; k < Math.min(s + 50, chunks.length); k++) {
-        batch[key + '_' + k] = chunks[k];
-      }
-      cache.putAll(batch, CONFIG.CACHE_SECONDS);
-    }
-    cache.put(key + '_m', JSON.stringify({ n: chunks.length, at: Date.now() }), CONFIG.CACHE_SECONDS);
-  } catch (err) {
-    // Kalau gagal menyimpan, tidak masalah: data tetap dikirim ke klien.
-    Logger.log('cache write gagal: ' + err);
-  }
-}
-
-function hash_(str) {
-  var h = 5381;
-  for (var i = 0; i < str.length; i++) {
-    h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
-  }
-  return h.toString(36);
-}
-
-// ------------------------------------------------------------ SHEET & VERSI
-function getSpreadsheet_() {
-  if (CONFIG.SPREADSHEET_ID) return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-
-  var active = null;
-  try { active = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) { active = null; }
-  if (active) return active;
-
-  var stored = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
-  if (stored) return SpreadsheetApp.openById(stored);
-
-  throw new Error('Spreadsheet tidak ditemukan. Isi CONFIG.SPREADSHEET_ID.');
-}
-
-function getSheet_() {
-  var ss = getSpreadsheet_();
-  if (CONFIG.SHEET_NAME) {
-    var named = ss.getSheetByName(CONFIG.SHEET_NAME);
-    if (!named) throw new Error('Sheet "' + CONFIG.SHEET_NAME + '" tidak ada.');
-    return named;
+  if (SHEET_NAME) {
+    return ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
   }
   return ss.getSheets()[0];
 }
 
-/**
- * Sidik jari murah: jumlah baris + hash baris terakhir.
- * Berubah setiap ada respons baru, tanpa membaca seluruh sheet.
- */
-function signature_(sheet) {
-  var cache = CacheService.getScriptCache();
-  var cached = cache.get('dsb_sig');
-  if (cached) return cached;
+/* --------------------------------------------------------------- TRIGGERS */
 
-  var lastRow = sheet.getLastRow();
-  var lastCol = sheet.getLastColumn();
-  var tail = '';
-  if (lastRow >= 1 && lastCol >= 1) {
-    tail = sheet.getRange(lastRow, 1, 1, lastCol).getDisplayValues()[0].join('|');
-  }
-  var sig = lastRow + '.' + hash_(tail);
-  cache.put('dsb_sig', sig, CONFIG.SIG_SECONDS);
-  return sig;
-}
-
-function version_() {
-  var props = PropertiesService.getScriptProperties();
-  var v = props.getProperty(CONFIG.PROP_VERSION);
-  if (!v) {
-    v = String(Date.now());
-    props.setProperty(CONFIG.PROP_VERSION, v);
-  }
-  return v;
-}
-
-/** Naikkan versi + buang cache. Dipanggil saat ada respons baru. */
-function bump_() {
-  PropertiesService.getScriptProperties().setProperty(CONFIG.PROP_VERSION, String(Date.now()));
-  CacheService.getScriptCache().remove('dsb_sig');
-}
-
-// ------------------------------------------------------------------ TRIGGER
-/**
- * Pasang trigger form-submit pada spreadsheet ini.
- * Jalankan SEKALI dari editor Apps Script (pilih fungsi ini > Run).
- */
 function installTriggers() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'onFormSubmit') ScriptApp.deleteTrigger(t);
+    if (t.getHandlerFunction() === "onFormSubmit") ScriptApp.deleteTrigger(t);
   });
-
-  ScriptApp.newTrigger('onFormSubmit')
-    .forSpreadsheet(getSpreadsheet_())
-    .onFormSubmit()
-    .create();
-
+  ScriptApp.newTrigger("onFormSubmit").forSpreadsheet(ss).onFormSubmit().create();
   bump_();
-  Logger.log('Trigger onFormSubmit terpasang.');
-  return 'Trigger terpasang';
+  try {
+    SpreadsheetApp.getUi().alert("Siap. Setiap kiriman form baru akan langsung memperbarui dashboard.");
+  } catch (ignore) { /* dipanggil dari editor, bukan menu */ }
 }
 
-function onFormSubmit(e) {
+function onFormSubmit() {
   bump_();
 }
 
-/** Bisa dipanggil manual untuk memaksa cache dibersihkan. */
-function clearCache() {
-  bump_();
-  Additional_clearDataCache_();
-  Logger.log('Cache dibersihkan.');
-  return 'Cache dibersihkan';
-}
-
-function Additional_clearDataCache_() {
-  // Versi berubah -> key cache lama otomatis tidak terpakai lagi.
-  CacheService.getScriptCache().remove('dsb_sig');
-}
-
-// --------------------------------------------------------------------- MENU
 function onOpen() {
-  try {
-    SpreadsheetApp.getUi()
-      .createMenu('Dashboard')
-      .addItem('Salin URL API', 'showApiUrl')
-      .addItem('Pasang trigger form submit', 'installTriggers')
-      .addItem('Kosongkan cache', 'clearCache')
-      .addItem('Cek koneksi API', 'showApiStatus')
-      .addToUi();
-  } catch (e) {
-    // Menu hanya tersedia untuk spreadsheet terikat.
-  }
+  SpreadsheetApp.getUi()
+    .createMenu("Dashboard")
+    .addItem("Pasang pembaruan otomatis", "installTriggers")
+    .addItem("Segarkan sekarang", "bump_")
+    .addItem("Lihat URL web app", "showUrl_")
+    .addToUi();
 }
 
-function showApiUrl() {
-  var url = ScriptApp.getService().getUrl() || '(belum dideploy)';
-  SpreadsheetApp.getUi().alert(
-    'Tempel URL ini ke assets/js/config.js -> API_URL:\n\n' + url +
-    '\n\nPastikan deployment: Execute as "Me", Who has access "Anyone".'
-  );
-}
-
-function showApiStatus() {
-  try {
-    var sheet = getSheet_();
-    var p = ping_();
-    SpreadsheetApp.getUi().alert(
-      'Sheet : ' + sheet.getName() +
-      '\nBaris : ' + (sheet.getLastRow() - 1) +
-      '\nVersi : ' + p.v
-    );
-  } catch (err) {
-    SpreadsheetApp.getUi().alert('Error: ' + err.message);
-  }
-}
-
-/** Untuk uji cepat dari editor: tampilkan ringkasan payload di log. */
-function testPayload() {
-  var p = data_(true);
-  Logger.log('Sheet : ' + p.sheet);
-  Logger.log('Kolom : ' + p.columns.join(', '));
-  Logger.log('Tipe  : ' + p.types.join(', '));
-  Logger.log('Baris : ' + p.count);
-  Logger.log('Sampel: ' + JSON.stringify(p.rows.slice(0, 2)));
-  return 'OK';
+function showUrl_() {
+  var url = ScriptApp.getService().getUrl() || "(belum di-deploy sebagai web app)";
+  SpreadsheetApp.getUi().alert(url);
 }

@@ -1,185 +1,146 @@
-# Dashboard Live — Google Form → Google Sheets → GitHub Pages
+# Town Hall Meeting Dosen — Hasil Langsung
 
-Dashboard statis (HTML/CSS/JS) yang membaca data Google Form **langsung dari Google Sheets** lewat Apps Script, dan memperbarui diri setiap ~10 detik tanpa reload. Animasi memakai GSAP.
+Halaman hasil survei bergaya dek presentasi (Swiss / IKB), membaca langsung dari
+Google Sheets. Setiap kiriman Google Form muncul tanpa refresh dan tanpa ekspor
+manual.
 
-```
-Google Form  →  Google Sheet  →  Apps Script Web App (JSON/JSONP)
-                                        ↓  polling versi ~10 dtk
-                                  GitHub Pages (dashboard)
-```
-
-- **Tanpa backend sendiri, tanpa database, tanpa API key.**
-- **Tanpa CORS drama** — data dikirim sebagai JSONP.
-- **Hemat kuota** — klien cek "versi" dulu; data penuh hanya diambil kalau ada perubahan.
-- **Tahan kolom berubah** — skema ditebak otomatis dari header & tipe data.
-
----
-
-## 1. Struktur folder
+- **Tampilan**: satu slide per pertanyaan, angka besar, histogram, peringkat pilihan,
+  pindah otomatis tiap 12 detik, navigasi `←` `→`, spasi untuk jeda.
+- **Data**: Google Sheets → Apps Script (JSONP) → halaman statis. Aman untuk GitHub Pages.
+- **Animasi**: GSAP 3 (angka berjalan, batang tumbuh, transisi antar slide, FLIP saat
+  peringkat berubah). Menghormati `prefers-reduced-motion`.
+- **Kolom dideteksi otomatis**: kolom angka 1–N menjadi slide skala, kolom teks pilihan
+  menjadi slide peringkat, dan slide pertama merangkum semuanya.
 
 ```
-.
-├── index.html                # halaman dashboard
-├── assets/
-│   ├── css/styles.css        # desain (light editorial)
-│   └── js/
-│       ├── config.js         # ← SATU-SATUNYA file yang perlu Anda ubah
-│       ├── format.js         # format angka, tanggal, relatif
-│       ├── api.js            # JSONP, polling, mode demo
-│       ├── charts.js         # chart SVG + animasi GSAP
-│       └── app.js            # orkestrasi data → DOM
-├── apps-script/
-│   ├── Code.gs               # API: doGet, ping, cache, trigger
-│   └── appsscript.json       # manifest
-├── .nojekyll                 # wajib untuk GitHub Pages
-└── README.md
+index.html
+assets/css/styles.css
+assets/js/config.js      ← satu-satunya file yang perlu diubah
+assets/js/format.js
+assets/js/api.js
+assets/js/deck.js
+apps-script/Code.gs      ← tempel ke Apps Script
+apps-script/appsscript.json
 ```
 
 ---
 
-## 2. Pasang Apps Script (5 menit)
+## 1. Deploy backend (sekali saja, ±3 menit)
 
-1. Buka spreadsheet respons Google Form Anda.
-2. **Extensions → Apps Script**.
-3. Hapus isi `Code.gs` bawaan, tempel seluruh isi `apps-script/Code.gs`. **Save**.
-4. (Opsional) Di bagian `CONFIG`, isi `SHEET_NAME` bila data bukan di tab pertama.
-5. **Deploy → New deployment → Web app**
+1. Buka spreadsheet Anda → **Extensions → Apps Script**.
+2. Hapus isi `Code.gs`, tempel seluruh isi `apps-script/Code.gs`.
+   Bila data bukan di tab pertama, isi `SHEET_NAME = "Form Responses 1"` di baris atas.
+3. **Deploy → New deployment → Web app**
    - Description: `dashboard`
-   - **Execute as: Me**
-   - **Who has access: Anyone**
-6. Klik **Deploy** → **Authorize access** → pilih akun → *Advanced → Go to … (unsafe) → Allow*.
-7. Salin URL yang berakhiran **`/exec`**.
+   - Execute as: **Me**
+   - Who has access: **Anyone**
+4. Klik **Deploy**, izinkan akses, lalu salin URL yang berakhiran **`/exec`**.
+5. Jalankan fungsi **`installTriggers`** sekali (pilih di dropdown lalu ▶ Run).
+   Ini memasang trigger `onFormSubmit` supaya data langsung ter-update saat ada
+   kiriman baru. Bisa juga lewat menu **Dashboard → Pasang pembaruan otomatis**
+   setelah halaman di-reload.
 
-### Pasang trigger (penting untuk "instan")
+Uji cepat di browser:
 
-Di editor Apps Script, pilih fungsi **`installTriggers`** dari dropdown → **Run** (sekali saja).
-Ini membuat trigger `onFormSubmit` yang menaikkan versi data begitu ada respons baru, sehingga dashboard tahu harus menarik data — biasanya dalam < 10 detik.
+```
+https://script.google.com/macros/s/XXXX/exec?action=ping
+```
 
-> Alternatif: dari spreadsheet, menu **Dashboard → Pasang trigger form submit**.
+Harus muncul JSON `{"ok":true,...}`.
 
-Setelah semua terpasang, menu **Dashboard** di spreadsheet punya:
-| Menu | Fungsi |
-|---|---|
-| Salin URL API | menampilkan URL `/exec` |
-| Pasang trigger form submit | membuat trigger realtime |
-| Kosongkan cache | paksa data segar |
-| Cek koneksi API | menampilkan sheet, jumlah baris, versi |
+## 2. Hubungkan halaman
 
----
-
-## 3. Sambungkan dashboard
-
-Buka `assets/js/config.js`, isi satu baris:
+Buka `assets/js/config.js`, isi:
 
 ```js
-API_URL: "https://script.google.com/macros/s/AKfycb.../exec",
+API_URL: "https://script.google.com/macros/s/XXXX/exec",
 ```
 
-Simpan, buka `index.html` di browser. Banner "MODE DEMO" akan hilang dan data asli muncul.
+Simpan. Halaman langsung memakai data asli. Selama `API_URL` kosong, halaman
+berjalan dengan **data contoh** (bentuknya sama dengan survei asli) agar tampilan
+bisa dinilai lebih dulu.
 
-**Uji cepat:** buka URL `/exec` di tab baru — harus muncul JSON. Tambahkan `?action=ping` untuk melihat versi ringan.
-
----
-
-## 4. Publikasikan ke GitHub Pages
+## 3. Hosting GitHub Pages
 
 ```bash
-git init
 git add .
-git commit -m "feat: live gsheet dashboard"
+git commit -m "deck survei town hall + data sheets"
 git branch -M main
-git remote add origin https://github.com/USERNAME/NAMA-REPO.git
+git remote add origin https://github.com/USERNAME/REPO.git
 git push -u origin main
 ```
 
-Lalu di GitHub: **Settings → Pages → Source: Deploy from a branch → Branch: `main` / root → Save**.
+Lalu **Settings → Pages → Source: Deploy from a branch → `main` / `/ (root)`**.
+Situs tersedia di `https://USERNAME.github.io/REPO/`.
 
-Situs tersedia di `https://USERNAME.github.io/NAMA-REPO/` setelah ±1 menit.
-
-> `.nojekyll` sudah disertakan agar folder `assets/` tidak diproses Jekyll.
+File `.nojekyll` sudah disertakan agar folder `assets/` tidak diproses Jekyll.
 
 ---
 
-## 5. Kustomisasi
+## Cara data mengalir
 
-Semua di `assets/js/config.js`:
-
-| Kunci | Arti |
+| Langkah | Yang terjadi |
 |---|---|
-| `TITLE`, `LEDE`, `EYEBROW_LIVE` | teks judul & narasi |
-| `POLL_MS` | interval cek data (default 10000) |
-| `COLUMNS` | paksa pemetaan kolom, mis. `{ date: "Timestamp", rating: "Kepuasan", category: "Produk", region: "Kota" }` |
-| `PALETTE` | warna kategori (urutan aman buta warna) |
-| `LOCALE`, `NUMBER_DECIMALS` | format angka |
-| `RECENT_COUNT`, `TABLE_ROWS` | jumlah baris kartu & tabel |
+| Halaman dibuka | `GET /exec` → JSON lengkap (kolom, tipe, baris) |
+| Tiap 10 detik | `GET /exec?action=ping` → hanya versi + jumlah baris |
+| Versi berubah | Ambil data lengkap, lalu angka & batang bertween ke nilai baru |
+| Form terkirim | Trigger `onFormSubmit` menaikkan versi → semua klien tahu |
 
-Gaya visual: `assets/css/styles.css`, semua warna ada di blok `:root`.
+Versi = nomor bump + jumlah baris + hash baris terakhir, sehingga perubahan isi
+sel juga terdeteksi. Data di-cache 20 detik di server (`CACHE_SECONDS`) agar Sheet
+tidak dibaca pada setiap polling.
 
-### Bagaimana kolom dipilih otomatis?
-
-1. **Tanggal** → kolom bertipe datetime (prioritas nama: `timestamp`, `waktu`, `tanggal`).
-2. **Nama** → kolom teks bernama `nama`, `name`, `responden`, `email`.
-3. **Rating** → kolom angka 2–11 nilai unik, prioritas nama `rating`, `skor`, `kepuasan`, `nps`.
-4. **Kategori** → kolom teks dengan 2–24 nilai unik dan teks pendek.
-5. **Wilayah** → kolom teks bernama `kota`, `lokasi`, `provinsi`, `region`.
-
-Kalau tebakan meleset, kunci dengan `COLUMNS`.
+**Latensi normal: 10–30 detik** setelah kiriman masuk. Ingin lebih cepat?
+Turunkan `CACHE_SECONDS` (mis. 5) dan `POLL_MS` (mis. 5000) — konsekuensinya kuota
+Apps Script lebih cepat terpakai.
 
 ---
 
-## 6. Cara kerja animasi
+## Mengatur tampilan data
 
-| Elemen | Animasi |
-|---|---|
-| Judul hero | mask-reveal + underline swipe (CSS) |
-| KPI | angka berjalan (`countTo`) dengan `power2.out`, kartu stagger |
-| Grafik tren | garis digambar via `stroke-dashoffset`, area via clip-path, titik puncak berdenyut |
-| Bar peringkat | lebar + label angka bergerak bersama (`stagger 0.06`) |
-| Komposisi | segmen melebar berurutan, legenda fade-in |
-| Respons baru | baris meluncur masuk + flash oranye + tag `baru` |
-| Data berubah | kartu utama di-pulse, KPI menghitung ulang |
+Semua pengaturan ada di `assets/js/config.js`.
 
-`prefers-reduced-motion` dihormati: semua animasi dimatikan otomatis.
+**Label pendek** untuk daftar kiri dan ringkasan:
 
----
-
-## 7. Troubleshooting
-
-| Gejala | Penyebab | Solusi |
-|---|---|---|
-| Banner "MODE DEMO" terus muncul | `API_URL` kosong | isi `API_URL` di config.js |
-| JSON tampil tapi dashboard kosong | sheet pertama bukan data | isi `CONFIG.SHEET_NAME` |
-| Error `Spreadsheet tidak ditemukan` | script tidak terikat | isi `CONFIG.SPREADSHEET_ID` |
-| Data tidak berubah setelah submit | trigger belum ada | Run `installTriggers` |
-| Data telat ±20 detik | cache server | normal; turunkan `CACHE_SECONDS` |
-| `Authorization required` | deployment bukan "Anyone" | Deploy ulang, ubah akses |
-| Grafik datar di 0 | kolom tanggal tidak terdeteksi | set `COLUMNS.date` |
-
-**Cek cepat backend:** buka `/exec?action=ping` — harus `{"ok":true,"v":"…"}`.
-
----
-
-## 8. Keamanan & batasan
-
-- Akses **Anyone** berarti siapa pun yang punya URL `/exec` bisa membaca data. **Jangan pakai untuk data sensitif** (email pribadi, nomor HP, data kesehatan). Kalau perlu, tambahkan token di `doGet` dan kirim lewat parameter.
-- Kuota Apps Script gratis: 20.000 `UrlFetch`/hari, 6 menit per eksekusi. Dashboard ini hanya membaca sheet, jadi sangat ringan.
-- Cache dibatasi ±20 detik; untuk data > 20.000 baris naikkan `MAX_ROWS` dengan hati-hati (batas cache 100KB per key sudah ditangani dengan chunk).
-- Data di sheet tetap milik Anda; dashboard hanya membaca.
-
----
-
-## 9. Menjalankan lokal
-
-Cukup buka `index.html` — tidak butuh build step. Untuk pengembangan:
-
-```bash
-npx serve .
-# atau
-python -m http.server 8080
+```js
+LABELS: [
+  { match: "kurikulum", label: "Kurikulum" },
+  { match: "rps",       label: "RPS" },
+  ...
+]
 ```
 
-Selama `API_URL` kosong, dashboard memakai **mode demo**: data sintetis yang bertambah tiap ~30 detik supaya semua animasi bisa dilihat.
+`match` dicocokkan dengan teks pertanyaan (huruf kecil). Urutan penting: taruh yang
+paling spesifik lebih dulu.
+
+**Memaksa kolom tertentu** (bila ada kolom angka lain yang ikut terdeteksi):
+
+```js
+COLUMNS: {
+  likert: ["Kurikulum", "RPS", "metode pembelajaran", "LMS", "literatur", "karier"],
+  choice: "dikurangi"
+}
+```
+
+**Lain-lain**: `TITLE`, `SUBTITLE`, `SUMMARY_HEADLINE`, `ROTATE_MS`, `LIKERT_MAX`.
+
+Teks skala ("Sangat tidak penting" … "Sangat penting") dipilih otomatis dari kata
+kunci pada pertanyaan: *penting*, *setuju*, *puas*, *sering*.
 
 ---
 
-Dibangun dengan Apps Script + GSAP 3. Tanpa framework, tanpa build, tanpa dependensi backend.
+## Jika ada masalah
+
+| Gejala | Penyebab & solusi |
+|---|---|
+| Banner "Gagal memuat data" | `API_URL` salah / deployment belum "Anyone". Buka URL `/exec` di tab baru. |
+| Semua slide kosong | Tidak ada kolom angka 1–N. Isi `COLUMNS.likert` manual. |
+| Angka tidak berubah | Trigger belum terpasang → jalankan `installTriggers`, atau tunggu cache 20 detik. |
+| Slide bertambah/berkurang | Jumlah kolom berubah di sheet; halaman membangun ulang otomatis. |
+| Teks label aneh | Tambahkan entri `LABELS` yang cocok. |
+
+## Catatan keamanan
+
+Akses **Anyone** membuat URL `/exec` dapat dibaca siapa pun yang tahu alamatnya.
+Cocok untuk survei internal yang tidak rahasia. Untuk data sensitif, batasi akses
+web app (mis. "Anyone with Google account") dan sesuaikan pemuatan data.

@@ -2,7 +2,7 @@
    DATA LAYER
    - Membaca JSON dari Apps Script Web App lewat JSONP (bebas CORS)
    - Polling ringan: cek "versi" dulu, ambil data penuh hanya bila berubah
-   - Mode demo: data sintetis yang terus bertambah agar animasi bisa dicoba
+   - Mode demo: data contoh dengan bentuk yang sama seperti sheet asli
    ========================================================================== */
 (function (global) {
   "use strict";
@@ -68,20 +68,38 @@
 
   /* ------------------------------------------------------------------ MOCK -- */
   var MOCK_DATA = (function () {
-    var NAMES = ["Budi Santoso", "Sari Wulandari", "Rizky Pratama", "Dewi Lestari", "Agus Setiawan",
-      "Putri Anggraini", "Hendra Wijaya", "Maya Kusuma", "Fajar Nugroho", "Intan Permata",
-      "Yoga Saputra", "Nadia Rahmawati", "Bayu Firmansyah", "Citra Maharani", "Dimas Anggara",
-      "Rani Oktaviani", "Eko Purnomo", "Lia Handayani", "Taufik Hidayat", "Sinta Amelia",
-      "Adi Kurniawan", "Wulan Sari", "Reza Maulana", "Nisa Aulia"];
-    var CITIES = ["Jakarta", "Bandung", "Surabaya", "Yogyakarta", "Denpasar", "Medan", "Semarang", "Makassar"];
-    var PRODUCTS = ["Paket Dasar", "Paket Pro", "Paket Bisnis", "Add-on Analitik", "Konsultasi"];
-    var NOTES = ["Sangat membantu, terima kasih.", "Mudah dipakai.", "Perlu tutorial tambahan.",
-      "Harga masih bisa dipertimbangkan.", "Fitur laporan excel ditunggu.", "", "", "", ""];
+    var QUESTIONS = [
+      "Seberapa penting kurikulum di-update secara berkala agar tetap relevan dengan perkembangan ilmu dan isu keuangan negara saat ini?",
+      "Seberapa penting RPS diperbarui setiap semester supaya materi kuliah tetap relevan dan tidak hanya copy-paste dari semester sebelumnya?",
+      "Seberapa penting penerapan metode pembelajaran inovatif, seperti case-based learning dan project-based learning, dalam meningkatkan kualitas pembelajaran mahasiswa?",
+      "Seberapa penting penggunaan Learning Management System (LMS) untuk mendukung proses pembelajaran yang lebih efektif dan efisien?",
+      "Seberapa penting penggunaan literatur dan referensi terbaru dalam mendukung kualitas materi serta proses pembelajaran?",
+      "Seberapa penting kesempatan naik jenjang karier atau jabatan akademik dalam mendukung pengembangan diri dosen?"
+    ];
+    var CHOICE_Q = "Jika dari beberapa aktivitas atau kewajiban berikut ada satu yang boleh dikurangi atau dihilangkan, akan pilih yang mana?";
+    var CHOICES = [
+      { label: "Penugasan tambahan di luar tugas utama", w: 56 },
+      { label: "Kewajiban publikasi di jurnal terindeks Scopus", w: 26 },
+      { label: "Kolaborasi lintas fungsi (cross-function)", w: 30 },
+      { label: "Kewajiban melakukan penelitian", w: 20 },
+      { label: "Kewajiban menggunakan database dalam penugasan", w: 19 }
+    ];
+    /* Sebaran jawaban contoh, meniru hasil survei asli. */
+    var DISTS = [
+      [2, 2, 8, 23, 46, 70],
+      [3, 3, 5, 32, 51, 57],
+      [0, 2, 12, 17, 49, 71],
+      [0, 7, 11, 29, 49, 55],
+      [1, 3, 8, 22, 52, 65],
+      [1, 4, 9, 43, 61, 33]
+    ];
+
+    var COLUMNS = ["Timestamp"].concat(QUESTIONS).concat([CHOICE_Q]);
+    var TYPES = ["datetime"].concat(QUESTIONS.map(function () { return "number"; })).concat(["string"]);
 
     var rnd = mulberry32(20261030);
     var rows = [];
     var version = 1;
-    var counter = 0;
 
     function mulberry32(a) {
       return function () {
@@ -91,50 +109,41 @@
         return ((t ^ t >>> 14) >>> 0) / 4294967296;
       };
     }
-    function pick(arr) { return arr[Math.floor(rnd() * arr.length)]; }
-    function weightedRating() {
-      var r = rnd();
-      if (r < 0.06) return 1;
-      if (r < 0.16) return 2;
-      if (r < 0.42) return 3;
-      if (r < 0.78) return 4;
-      return 5;
+
+    function sampleDist(dist) {
+      var total = 0, i;
+      for (i = 0; i < dist.length; i++) total += dist[i];
+      var r = rnd() * total;
+      for (i = 0; i < dist.length; i++) {
+        r -= dist[i];
+        if (r <= 0) return i + 1;
+      }
+      return dist.length;
+    }
+
+    function sampleChoice() {
+      var total = 0, i;
+      for (i = 0; i < CHOICES.length; i++) total += CHOICES[i].w;
+      var r = rnd() * total;
+      for (i = 0; i < CHOICES.length; i++) {
+        r -= CHOICES[i].w;
+        if (r <= 0) return CHOICES[i].label;
+      }
+      return CHOICES[0].label;
     }
 
     function makeRow(date) {
-      var rating = weightedRating();
-      return [
-        date.toISOString(),
-        pick(NAMES) + (rnd() > 0.72 ? " " + String.fromCharCode(65 + Math.floor(rnd() * 26)) + "." : ""),
-        pick(CITIES),
-        pick(PRODUCTS),
-        rating,
-        Math.max(1, Math.min(5, rating + (rnd() > 0.7 ? (rnd() > 0.5 ? 1 : -1) : 0))),
-        pick(NOTES)
-      ];
+      return [date.toISOString()]
+        .concat(DISTS.map(sampleDist))
+        .concat([sampleChoice()]);
     }
 
-    function build() {
-      var now = new Date();
-      var DAYS = 46;
-      for (var d = DAYS; d >= 0; d--) {
-        var date = new Date(now.getTime() - d * 86400000);
-        var dow = date.getDay();
-        var weekend = (dow === 0 || dow === 6);
-        var trend = 2.1 + (DAYS - d) * 0.055;
-        var wave = Math.sin((DAYS - d) / 7 * Math.PI * 2) * 0.9;
-        var noise = (rnd() - 0.5) * 1.7;
-        var count = Math.max(0, Math.round(trend + wave + noise + (weekend ? -1.1 : 0.6)));
-        for (var i = 0; i < count; i++) {
-          var t = new Date(date.getTime());
-          t.setHours(7 + Math.floor(rnd() * 14), Math.floor(rnd() * 60), Math.floor(rnd() * 60), 0);
-          if (t > now) t = new Date(now.getTime() - Math.floor(rnd() * 3 * 3600000));
-          rows.push(makeRow(t));
-        }
+    (function build() {
+      var now = Date.now();
+      for (var i = 0; i < 151; i++) {
+        rows.push(makeRow(new Date(now - (151 - i) * 97000)));
       }
-      rows.sort(function (a, b) { return new Date(a[0]) - new Date(b[0]); });
-    }
-    build();
+    })();
 
     return {
       payload: function (withRows) {
@@ -142,24 +151,21 @@
           ok: true,
           v: String(version),
           updatedAt: new Date().toISOString(),
-          sheet: "Form Responses 1 (demo)",
-          columns: ["Timestamp", "Nama", "Kota", "Produk", "Rating", "Kepuasan", "Saran"],
-          types: ["datetime", "string", "string", "string", "number", "number", "string"],
+          sheet: "Form Responses 1 (contoh)",
+          columns: COLUMNS,
+          types: TYPES,
           count: rows.length,
           demo: true
         };
-        if (withRows) p.rows = rows.slice();
+        if (withRows) p.rows = rows.map(function (r) { return r.slice(); });
         return p;
       },
       ping: function () {
         return { ok: true, v: String(version), updatedAt: new Date().toISOString(), count: rows.length };
       },
       tick: function () {
-        var d = new Date();
-        rows.push(makeRow(d));
+        rows.push(makeRow(new Date()));
         version++;
-        counter++;
-        return counter;
       }
     };
   })();
@@ -180,11 +186,9 @@
     isMock: MOCK,
     endpoint: ENDPOINT,
 
-    /** Muat penuh. */
     load: function (opts) {
       opts = opts || {};
-      var force = !!opts.force;
-      return fetchData(force).then(function (payload) {
+      return fetchData(!!opts.force).then(function (payload) {
         if (!payload || payload.ok === false) {
           throw new Error((payload && payload.error) || "Respons tidak valid");
         }
@@ -194,7 +198,6 @@
       });
     },
 
-    /** Cek versi; panggil onData hanya bila berubah. */
     check: function () {
       if (state.inflight) return Promise.resolve(null);
       state.inflight = true;
@@ -232,6 +235,7 @@
       function loop() {
         clearTimeout(state.timer);
         state.timer = setTimeout(function () {
+          if (document.hidden) { loop(); return; }
           if (MOCK) {
             MOCK_DATA.tick();
             if (state.handlers.data) state.handlers.data(MOCK_DATA.payload(true));
@@ -252,7 +256,6 @@
       state.timer = null;
     },
 
-    /** Paksa ambil ulang penuh sekarang. */
     refresh: function () {
       return this.load({ force: true });
     }

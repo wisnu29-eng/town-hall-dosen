@@ -1,9 +1,11 @@
-node_modules/
-dist/
-.DS_Store
+# OS / editor
 Thumbs.db
+.DS_Store
 desktop.ini
-.vscode/
-.idea/
+
+# Referensi desain (tidak ikut di-deploy)
+Town Hall Meeting Dosen_ Hasil Langsung.html
+
+# Log
 *.log
-.env
+serve.log
