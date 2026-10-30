@@ -130,7 +130,7 @@ h2{
 
 .cap{margin:0;font-size:1.18rem;line-height:1.35;color:var(--grey-3);max-width:24ch}
 .cap strong{display:block;font-weight:400;font-size:1.9rem;line-height:1.1;letter-spacing:-.015em;color:var(--ink);margin-bottom:.3rem;max-width:none}
-.cap .lead{font-size:1.5rem;line-height:1.25;letter-spacing:-.01em;max-width:24ch}
+.cap .lead{font-size:1.5rem;line-height:1.25;letter-spacing:-.01em;max-width:24ch;font-weight:600}
 
 /* rincian dua nilai tertinggi */
 .split{margin-top:.2rem;width:100%;max-width:28rem;border-top:1px solid var(--line)}
