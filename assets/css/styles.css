@@ -166,29 +166,27 @@ h2{
 .opt:not(.lead) .track u{background:var(--tint)}
 
 /* ringkasan */
-.cards{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:0 2.4rem;margin-top:1.1rem}
+.cards{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,1fr);grid-auto-rows:1fr;gap:0 3rem;margin-top:1.1rem}
 .card{
-  display:flex;align-items:center;gap:1.1rem;min-width:0;padding:.85rem .1rem;
-  text-align:left;border-bottom:1px solid var(--line);
+  display:grid;grid-template-columns:minmax(5.6rem,42%) 1fr;gap:1.1rem;align-items:center;
+  min-width:0;padding:.85rem .1rem;text-align:left;border-bottom:1px solid var(--line);
 }
-.card__ring{position:relative;flex:none;width:5.8rem;height:5.8rem;display:block}
-.card__ring svg{display:block;width:100%;height:100%}
-.ring__bg{fill:none;stroke:var(--grey-2);stroke-width:3.4}
-.ring__fg{
-  fill:none;stroke:var(--accent);stroke-width:3.4;
-  stroke-dasharray:100;stroke-dashoffset:100;
-  transform:rotate(-90deg);transform-origin:50% 50%;
-}
-.card__pc{
-  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-size:1.02rem;font-weight:500;letter-spacing:-.01em;
-}
+
+/* sebaran jawaban 1..N */
+.spark{display:flex;flex-direction:column;justify-content:center;gap:.26rem;min-width:0}
+.spark i{display:flex;align-items:center;gap:.4rem;height:.72rem;font-style:normal}
+.spark .b{flex:1;height:100%;min-width:0;display:block}
+.spark u{display:block;height:100%;width:0;background:var(--grey-2)}
+.spark i.on u{background:var(--accent)}
+.spark b{width:.9rem;flex:none;font-weight:400;font-size:.68rem;line-height:1;color:var(--grey-3);text-align:left}
+
 .card__t{display:block;min-width:0}
-.card__n{display:block;font-size:1.15rem;font-weight:500;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card__v{display:block;font-weight:300;font-size:3rem;line-height:1;letter-spacing:-.03em;margin:.22rem 0 .18rem}
-.card__v em{font-style:normal}
+.card__n{display:block;font-size:1.45rem;font-weight:600;line-height:1.1;letter-spacing:-.025em}
+.card__v{display:flex;align-items:baseline;gap:.45rem;font-weight:300;line-height:1;margin:.35rem 0 .3rem}
+.card__v em{font-style:normal;font-size:3rem;letter-spacing:-.035em;color:var(--accent)}
+.card__v span{font-size:1.5rem;color:var(--grey-3);letter-spacing:-.02em}
 .card__s{display:block;font-style:normal;font-size:.9rem;color:var(--grey-3);line-height:1.3}
-.card:hover .ring__fg{stroke-width:4.4}
+.card:hover .card__n{color:var(--accent)}
 
 .pick{
   display:grid;grid-template-columns:auto 1fr;gap:0 1.2rem;align-items:center;
