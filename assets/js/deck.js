@@ -470,7 +470,7 @@
     }
 
     setNum(r.big, lead.share * 100, { instant: instant, fmt: fmtInt, duration: 1 });
-    r.lead.textContent = lead.label;
+    r.lead.textContent = "memilih " + lead.label;
     r.sub.textContent = lead.count + " dari " + c.total + " responden";
 
     /* FLIP saat urutan peringkat berubah karena data baru */
