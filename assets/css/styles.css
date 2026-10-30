@@ -19,7 +19,16 @@
   padding-bottom:env(safe-area-inset-bottom,0px);
 }
 
-html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px);font-size:clamp(13px,1.25vw,32px)}
+html{
+  height:100%;scroll-padding-top:env(safe-area-inset-top,0px);
+  /* Skala tipografi mengikuti lebar DAN tinggi layar, tanpa batas atas kaku:
+     - di layar lebar resolusi tinggi dek tetap sebanding (tidak "mengecil" jadi
+       poster kecil di tengah layar),
+     - di layar 16:9 / pendek isi tetap muat tanpa terpotong.
+     Rasio 1.1vw : 1.7vh dijaga supaya proporsi dek sama di semua ukuran. */
+  font-size:clamp(13px,1vw,32px);
+  font-size:calc(clamp(12px,min(1.1vw,1.7vh),48px) * var(--scale,1));
+}
 
 *,*::before,*::after{box-sizing:inherit}
 
@@ -182,7 +191,7 @@ h2{
 
 /* ------------------------------------------------------------------ MOBILE */
 @media (max-width:900px){
-  html{font-size:15px}
+  html{font-size:calc(15px * var(--scale,1))}
   body{overflow:auto}
   .app{grid-template-columns:1fr;height:auto;min-height:100%}
   .rail{display:none}

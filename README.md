@@ -128,6 +128,15 @@ COLUMNS: {
 
 **Lain-lain**: `TITLE`, `SUBTITLE`, `SUMMARY_HEADLINE`, `ROTATE_MS`, `LIKERT_MAX`.
 
+**Ukuran tampilan.** Dek otomatis menyesuaikan diri: ukuran huruf mengikuti lebar
+*dan* tinggi jendela, jadi isi slide selalu muat penuh tanpa perlu zoom browser.
+Bila di layar/proyektor Anda hasilnya terasa terlalu besar atau terlalu kecil,
+cukup ubah satu angka:
+
+```js
+DISPLAY_SCALE: 1      // 0.9 = lebih kecil, 1.1 = lebih besar
+```
+
 Teks skala ("Sangat tidak penting" … "Sangat penting") dipilih otomatis dari kata
 kunci pada pertanyaan: *penting*, *setuju*, *puas*, *sering*.
 
@@ -142,6 +151,7 @@ kunci pada pertanyaan: *penting*, *setuju*, *puas*, *sering*.
 | Angka tidak berubah | Trigger belum terpasang → jalankan `installTriggers`, atau tunggu cache 20 detik. |
 | Slide bertambah/berkurang | Jumlah kolom berubah di sheet; halaman membangun ulang otomatis. |
 | Teks label aneh | Tambahkan entri `LABELS` yang cocok. |
+| Terasa terlalu besar / kecil | Ubah `DISPLAY_SCALE` (0.9 atau 1.1) di `config.js`. |
 
 ## Catatan keamanan
 

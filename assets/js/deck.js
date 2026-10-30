@@ -728,6 +728,9 @@
   function boot() {
     var brand = $("#brandName");
     var sub = $("#brandSub");
+    if (CFG.DISPLAY_SCALE && CFG.DISPLAY_SCALE !== 1) {
+      document.documentElement.style.setProperty("--scale", String(CFG.DISPLAY_SCALE));
+    }
     if (brand && CFG.TITLE) brand.textContent = CFG.TITLE;
     if (sub && CFG.SUBTITLE) sub.textContent = CFG.SUBTITLE;
 
