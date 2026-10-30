@@ -341,13 +341,13 @@
       "<h2>" + FMT.esc(c.q) + "</h2>" +
       '<div class="body">' +
         '<div class="L"><div class="big"><b class="pvbig">0</b><span>%</span></div>' +
-        '<p class="cap"><strong class="lead">—</strong><span class="sub"></span></p></div>' +
+        '<p class="cap"><strong class="lead"><span class="lw">memilih</span> <span class="lv">—</span></strong><span class="sub"></span></p></div>' +
         '<div class="R opts">' + opts + "</div>" +
       "</div>";
 
     var refs = {
       big: $(".pvbig", sec),
-      lead: $(".lead", sec),
+      lead: $(".lv", sec),
       sub: $(".sub", sec),
       opts: $$(".opt", sec)
     };
@@ -470,7 +470,7 @@
     }
 
     setNum(r.big, lead.share * 100, { instant: instant, fmt: fmtInt, duration: 1 });
-    r.lead.textContent = "memilih " + lead.label;
+    r.lead.textContent = lead.label;
     r.sub.textContent = lead.count + " dari " + c.total + " responden";
 
     /* FLIP saat urutan peringkat berubah karena data baru */
