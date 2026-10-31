@@ -324,8 +324,6 @@
           '<span class="c2__m"><b class="c2__t">0</b><i>Total</i></span></span>' +
         '<span class="c2__l"' + (o.legStyle ? ' style="' + o.legStyle + '"' : "") + ">" + rows + "</span>" +
       "</span>" +
-      '<span class="c2__f"><b class="c2__c">0</b><span class="c2__u">Dosen</span>' +
-        '<span class="c2__y">memilih <b>—</b></span></span>' +
       "</button>";
   }
 
@@ -371,8 +369,6 @@
           el: el,
           svg: $(".c2__s", el),
           t: $(".c2__t", el),
-          c: $(".c2__c", el),
-          foot: $(".c2__y b", el),
           pcts: $$(".lg__p", el),
           values: [],
           tw: null
@@ -389,7 +385,8 @@
 
     var cols = "";
     for (var k = 0; k < l.max; k++) {
-      cols += '<div class="col"><div class="bw"><div class="bar"><em>0</em></div></div></div>';
+      cols += '<div class="col"><div class="bw"><div class="bar">' +
+        '<em><b>0</b><span>0%</span></em></div></div></div>';
     }
     var ax = "";
     for (var a = 1; a <= l.max; a++) ax += "<i>" + a + "</i>";
@@ -422,7 +419,8 @@
       sn: $$(".split .sn", sec),
       cols: $$(".col", sec),
       bars: $$(".bar", sec),
-      ems: $$(".bar em", sec)
+      ems: $$(".bar em b", sec),
+      pps: $$(".bar em span", sec)
     };
     return sec;
   }
@@ -466,7 +464,6 @@
       r.cards.forEach(function (c) {
         if (c.tw) { c.tw.kill(); c.tw = null; }
         c.t.__num = { v: 0 }; c.t.textContent = "0";
-        c.c.__num = { v: 0 }; c.c.textContent = "0";
         paintDonut(c.svg, c.values, 0);
       });
       gsap.fromTo(r.cards.map(function (c) { return c.el; }),
@@ -493,22 +490,14 @@
       for (var k = l.max; k >= 1; k--) values.push(l.dist[k - 1] || 0);
       c.values = values;
 
-      var top = l.ranked[0] || { v: l.max, c: 0 };
-      var ends = scaleEnds(l.q);
       var d = replay ? .05 + i * .04 : 0;
 
       setNum(c.t, l.total, { instant: instant, duration: .8, delay: d });
-      setNum(c.c, top.c, { instant: instant, duration: .9, delay: d });
 
       c.pcts.forEach(function (p, idx) {
         var count = l.dist[l.max - idx - 1] || 0;
         p.textContent = fmtPct(l.total ? (count / l.total) * 100 : 0);
       });
-
-      var opt = "angka " + top.v;
-      if (top.v === l.max) opt += " (" + ends.right + ")";
-      else if (top.v === 1) opt += " (" + ends.left + ")";
-      c.foot.textContent = opt;
 
       sweep(c, values, d);
     });
@@ -518,18 +507,15 @@
       if (cc) {
         var opts = m.choice.options.slice(0, 8);
         var values = opts.map(function (o) { return o.count; });
-        var lead = opts[0];
         var d2 = replay ? .05 + m.likert.length * .04 : 0;
         cc.values = values;
 
         setNum(cc.t, m.choice.total, { instant: instant, duration: .8, delay: d2 });
-        setNum(cc.c, lead ? lead.count : 0, { instant: instant, duration: .9, delay: d2 });
 
         cc.pcts.forEach(function (p, idx) {
           var o = opts[idx];
           p.textContent = o ? fmtPct((o.count / (m.choice.total || 1)) * 100) : "0%";
         });
-        cc.foot.textContent = lead ? lead.label : "—";
 
         sweep(cc, values, d2);
       }
@@ -555,6 +541,10 @@
         if (e.__tw) { e.__tw.kill(); e.__tw = null; }
         e.__num = { v: 0 }; e.textContent = "0";
       });
+      r.pps.forEach(function (e) {
+        if (e.__tw) { e.__tw.kill(); e.__tw = null; }
+        e.__num = { v: 0 }; e.textContent = "0%";
+      });
       r.bars.forEach(function (b) { gsap.set(b, { height: "0%" }); });
     }
 
@@ -578,10 +568,12 @@
     r.cols.forEach(function (col, k) {
       var v = l.dist[k] || 0;
       var pct = l.maxDist ? (v / l.maxDist) * 100 : 0;
+      var share = l.total ? (v / l.total) * 100 : 0;
       col.classList.toggle("mode", v === l.maxDist && v > 0);
       var dd = replay ? .08 + k * .05 : 0;
       sizeTo(col.querySelector(".bar"), "height", pct, { instant: instant, duration: .95, delay: dd });
-      setNum(col.querySelector("em"), v, { instant: instant, duration: .95, delay: dd });
+      setNum(col.querySelector("em b"), v, { instant: instant, duration: .95, delay: dd });
+      setNum(col.querySelector("em span"), share, { instant: instant, fmt: fmtPct, duration: .95, delay: dd });
     });
   }
 

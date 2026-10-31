@@ -155,13 +155,13 @@ kunci pada pertanyaan: *penting*, *setuju*, *puas*, *sering*.
    itu berasal.
 
 Grafik batang di kanan menunjukkan sebaran seluruh jawaban 1–6 (jumlah orang
-per nilai). Tidak ada skor rata-rata atau kategori yang ditampilkan.
+dan persentasenya di atas tiap batang). Tidak ada skor rata-rata atau kategori
+yang ditampilkan.
 
 Slide **Ringkasan** berupa kartu per aspek: cincin (donat) sebaran jawaban 1–6
-dengan total responden di tengah, daftar persentase tiap nilai di kanan, dan
-bilah biru di bawah berisi jumlah dosen pada nilai terbanyak serta keterangan
-"memilih angka N". Pertanyaan pilihan (ke-7) memakai kartu selebar baris dengan
-daftar opsi dua kolom.
+dengan total responden di tengah, dan daftar persentase tiap nilai di kanannya.
+Pertanyaan pilihan (ke-7) memakai kartu selebar baris dengan daftar opsi dua
+kolom.
 
 **Tautan ke slide tertentu**: buka `index.html#4` untuk langsung ke slide ke-4
 (berguna saat rapat atau saat mengirim tautan ke bagian tertentu).
