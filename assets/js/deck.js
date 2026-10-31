@@ -249,56 +249,135 @@
 
   /* Kategori skor Likert tidak ditampilkan; slide memakai sebaran jawaban. */
 
+  /* ------------------------------------------------------------- DONAT ---- */
+  /* Enam tingkat biru: 0 = nilai tertinggi (biru utama) → 5 = paling pudar. */
+  var TONES = ["#0A35F5", "#3F5FF6", "#7C91F8", "#A9B7FA", "#CBD3FC", "#E5E9FD"];
+
+  function toneFor(idx, n) {
+    if (n <= 1) return TONES[0];
+    var k = Math.round((idx * (TONES.length - 1)) / (n - 1));
+    return TONES[Math.max(0, Math.min(TONES.length - 1, k))];
+  }
+
+  function polar(cx, cy, r, deg) {
+    var a = (deg * Math.PI) / 180;
+    /* 0° = pukul 12, bertambah berlawanan arah jarum jam (seperti contoh). */
+    return { x: cx - r * Math.sin(a), y: cy - r * Math.cos(a) };
+  }
+
+  function arcPath(cx, cy, r, a0, a1) {
+    if (a1 - a0 >= 359.9) a1 = a0 + 359.9;
+    var p0 = polar(cx, cy, r, a0);
+    var p1 = polar(cx, cy, r, a1);
+    var large = a1 - a0 > 180 ? 1 : 0;
+    return "M" + p0.x.toFixed(2) + " " + p0.y.toFixed(2) +
+      "A" + r + " " + r + " 0 " + large + " 0 " + p1.x.toFixed(2) + " " + p1.y.toFixed(2);
+  }
+
+  function donutSvg(n) {
+    var segs = "";
+    for (var i = 0; i < n; i++) segs += '<path class="dg" d=""></path>';
+    return '<svg class="c2__s" viewBox="0 0 100 100" aria-hidden="true">' + segs + "</svg>";
+  }
+
+  /* progress 0..1 = cincin tumbuh searah jarum jam dari pukul 12. */
+  function paintDonut(svg, values, progress) {
+    if (!svg || !values) return;
+    var total = 0;
+    for (var i = 0; i < values.length; i++) total += values[i];
+    var paths = svg.querySelectorAll(".dg");
+    var n = values.length;
+    var acc = 0;
+    var visible = 360 * progress;
+
+    for (var j = 0; j < paths.length; j++) {
+      var span = total ? (values[j] / total) * 360 : 0;
+      var start = acc;
+      acc += span;
+
+      var p = paths[j];
+      var drawn = Math.max(0, Math.min(span, visible - start));
+      if (drawn <= 0.05) { p.setAttribute("d", ""); continue; }
+
+      var a0 = start;
+      var a1 = start + drawn;
+      if (drawn > 2.6) { a0 += 1.3; a1 -= 1.3; }
+      p.setAttribute("d", arcPath(50, 50, 42, a0, a1));
+      p.setAttribute("stroke", toneFor(j, n));
+    }
+  }
+
+  function summaryCard(o) {
+    var rows = "";
+    o.rows.forEach(function (row, idx) {
+      var top = o.cols && idx < o.cols;
+      rows += '<span class="lg' + (top ? " lg--top" : "") + '">' +
+        '<u style="background:' + toneFor(idx, o.rows.length) + '"></u>' +
+        '<span class="lg__l">' + FMT.esc(row.label) + "</span>" +
+        '<b class="lg__p">0%</b></span>';
+    });
+
+    return '<button type="button" class="c2' + (o.wide ? " c2--wide" : "") + '" data-i="' + o.i + '">' +
+      '<span class="c2__h"><span class="c2__n">' + FMT.esc(o.name) + "<b>.</b></span></span>" +
+      '<span class="c2__b">' +
+        '<span class="c2__d">' + donutSvg(o.rows.length) +
+          '<span class="c2__m"><b class="c2__t">0</b><i>Total</i></span></span>' +
+        '<span class="c2__l"' + (o.legStyle ? ' style="' + o.legStyle + '"' : "") + ">" + rows + "</span>" +
+      "</span>" +
+      '<span class="c2__f"><b class="c2__c">0</b><span class="c2__u">Dosen</span>' +
+        '<span class="c2__y">memilih <b>—</b></span></span>' +
+      "</button>";
+  }
+
   function summarySection(m) {
     var sec = document.createElement("section");
     var totalQ = m.likert.length + (m.choice ? 1 : 0);
 
     var cards = m.likert.map(function (l, i) {
-      var rows = "";
-      for (var k = 1; k <= l.max; k++) {
-        rows += '<i data-v="' + k + '"><span class="b"><u></u></span><b>' + k + "</b></i>";
+      var ends = scaleEnds(l.q);
+      var rows = [];
+      for (var k = l.max; k >= 1; k--) {
+        var lab = "Angka " + k;
+        if (k === l.max) lab += " (" + ends.right + ")";
+        else if (k === 1) lab += " (" + ends.left + ")";
+        rows.push({ label: lab });
       }
-      return '<button type="button" class="card" data-i="' + (i + 1) + '">' +
-        '<span class="spark">' + rows + "</span>" +
-        '<span class="card__t">' +
-          '<span class="card__n">' + FMT.esc(l.label) + "</span>" +
-          '<b class="card__v"><em>0</em><span>Dosen</span></b>' +
-          '<i class="card__s">—</i>' +
-        "</span></button>";
+      return summaryCard({ i: i + 1, name: l.label, rows: rows });
     }).join("");
 
-    var pick = "";
+    /* Pertanyaan pilihan (ke-7): label = teks opsi, dua kolom. */
     if (m.choice) {
-      pick = '<button type="button" class="pick" data-i="' + totalQ + '">' +
-        '<b class="pick__v"><em class="pv">0</em></b>' +
-        '<span class="pick__t"><span class="pick__l">—</span>' +
-        '<i class="pick__n">0 dari ' + m.n + " responden</i></span>" +
-        "</button>";
+      var opts = m.choice.options.slice(0, 8);
+      var rows = opts.map(function (o) { return { label: o.label }; });
+      var colRows = Math.ceil(rows.length / 2);
+      cards += summaryCard({
+        i: totalQ,
+        name: m.choice.label,
+        rows: rows,
+        wide: true,
+        cols: 2,
+        legStyle: "grid-template-rows:repeat(" + colRows + ",auto)"
+      });
     }
 
     sec.innerHTML =
       '<div class="meta"><span>Ringkasan</span><span>' + totalQ + " pertanyaan · " + m.n + " responden</span></div>" +
       "<h2>" + FMT.esc(CFG.SUMMARY_HEADLINE || "Hasil sementara survei") + "</h2>" +
-      '<div class="cards">' + cards + "</div>" +
-      pick;
+      '<div class="cards">' + cards + "</div>";
 
     sec.__refs = {
-      cards: $$(".card", sec).map(function (el) {
+      cards: $$(".c2", sec).map(function (el) {
         return {
           el: el,
-          v: $(".card__v em", el),
-          s: $(".card__s", el),
-          rows: $$(".spark i", el).map(function (row) {
-            return { el: row, u: $("u", row) };
-          })
+          svg: $(".c2__s", el),
+          t: $(".c2__t", el),
+          c: $(".c2__c", el),
+          foot: $(".c2__y b", el),
+          pcts: $$(".lg__p", el),
+          values: [],
+          tw: null
         };
-      }),
-      pick: {
-        el: $(".pick", sec),
-        pv: $(".pv", sec),
-        l: $(".pick__l", sec),
-        n: $(".pick__n", sec)
-      }
+      })
     };
     return sec;
   }
@@ -385,47 +464,75 @@
 
     if (replay) {
       r.cards.forEach(function (c) {
-        c.v.__num = { v: 0 }; c.v.textContent = "0";
-        c.rows.forEach(function (row) {
-          row.el.classList.remove("on");
-          gsap.set(row.u, { width: "0%" });
-        });
+        if (c.tw) { c.tw.kill(); c.tw = null; }
+        c.t.__num = { v: 0 }; c.t.textContent = "0";
+        c.c.__num = { v: 0 }; c.c.textContent = "0";
+        paintDonut(c.svg, c.values, 0);
       });
-      if (r.pick.el) {
-        r.pick.pv.__num = { v: 0 }; r.pick.pv.textContent = "0";
-      }
       gsap.fromTo(r.cards.map(function (c) { return c.el; }),
         { opacity: 0, y: 10 },
-        { opacity: 1, y: 0, duration: .5, stagger: .06, ease: "power2.out", overwrite: true });
+        { opacity: 1, y: 0, duration: .5, stagger: .05, ease: "power2.out", overwrite: true });
+    }
+
+    function sweep(c, values, delay) {
+      if (instant || !canAnimate()) { paintDonut(c.svg, values, 1); return; }
+      if (c.tw) { c.tw.kill(); c.tw = null; }
+      var o = { p: 0 };
+      c.tw = gsap.to(o, {
+        p: 1, duration: .9, delay: delay, ease: "power2.out",
+        onUpdate: function () { paintDonut(c.svg, values, o.p); },
+        onComplete: function () { paintDonut(c.svg, values, 1); c.tw = null; }
+      });
     }
 
     m.likert.forEach(function (l, i) {
       var c = r.cards[i];
       if (!c) return;
+
+      var values = [];
+      for (var k = l.max; k >= 1; k--) values.push(l.dist[k - 1] || 0);
+      c.values = values;
+
       var top = l.ranked[0] || { v: l.max, c: 0 };
       var ends = scaleEnds(l.q);
-      var peak = l.maxDist || 1;
-      var d = replay ? .06 + i * .05 : 0;
+      var d = replay ? .05 + i * .04 : 0;
 
-      setNum(c.v, top.c, { instant: instant, duration: .9, delay: d });
-      c.s.textContent = "memilih angka " + top.v + (top.v === l.max ? " (" + ends.right + ")" : "");
+      setNum(c.t, l.total, { instant: instant, duration: .8, delay: d });
+      setNum(c.c, top.c, { instant: instant, duration: .9, delay: d });
 
-      l.dist.forEach(function (count, k) {
-        var row = c.rows[k];
-        if (!row) return;
-        row.el.classList.toggle("on", count === peak && peak > 0);
-        sizeTo(row.u, "width", peak ? (count / peak) * 100 : 0, {
-          instant: instant, duration: .8, delay: d + k * .03
-        });
+      c.pcts.forEach(function (p, idx) {
+        var count = l.dist[l.max - idx - 1] || 0;
+        p.textContent = fmtPct(l.total ? (count / l.total) * 100 : 0);
       });
+
+      var opt = "angka " + top.v;
+      if (top.v === l.max) opt += " (" + ends.right + ")";
+      else if (top.v === 1) opt += " (" + ends.left + ")";
+      c.foot.textContent = opt;
+
+      sweep(c, values, d);
     });
 
-    if (m.choice && r.pick.el) {
-      var lead = m.choice.options[0];
-      var dp = replay ? .06 + m.likert.length * .05 : 0;
-      setNum(r.pick.pv, lead.share * 100, { instant: instant, fmt: fmtPct, duration: .9, delay: dp });
-      r.pick.l.textContent = "memilih " + lead.label;
-      r.pick.n.textContent = lead.count + " dari " + m.choice.total + " responden";
+    if (m.choice) {
+      var cc = r.cards[m.likert.length];
+      if (cc) {
+        var opts = m.choice.options.slice(0, 8);
+        var values = opts.map(function (o) { return o.count; });
+        var lead = opts[0];
+        var d2 = replay ? .05 + m.likert.length * .04 : 0;
+        cc.values = values;
+
+        setNum(cc.t, m.choice.total, { instant: instant, duration: .8, delay: d2 });
+        setNum(cc.c, lead ? lead.count : 0, { instant: instant, duration: .9, delay: d2 });
+
+        cc.pcts.forEach(function (p, idx) {
+          var o = opts[idx];
+          p.textContent = o ? fmtPct((o.count / (m.choice.total || 1)) * 100) : "0%";
+        });
+        cc.foot.textContent = lead ? lead.label : "—";
+
+        sweep(cc, values, d2);
+      }
     }
   }
 
