@@ -120,8 +120,9 @@ localStorage dan jawaban peserta disimulasikan agar grafik host bergerak.
   lompat; `R` menampilkan/menyembunyikan hasil, `←` `→` pindah pertanyaan.
 - **Peserta**: jawaban tidak bisa diubah setelah dikirim. Satu jawaban per
   `RespondentID` per pertanyaan; kiriman ganda diabaikan server.
-- **Sesi baru** menghapus semua jawaban (dengan konfirmasi) dan mengembalikan sesi ke
-  *Belum dimulai*.
+- **Sesi baru** menghapus **semua baris jawaban** di tab `Survei Town Hall` (dengan
+  konfirmasi) dan mengembalikan sesi ke *Belum dimulai*. Jangan ditekan setelah acara
+  mulai mengumpulkan jawaban.
 - **Skala 200 peserta**: peserta memanggil Apps Script tiap 10 detik (host 3 detik),
   dengan variasi acak ±20% agar tidak membanjiri server bersamaan. Saat sesi belum
   dimulai polling peserta melambat ke 15 detik, dan 30 detik setelah sesi selesai.
@@ -143,4 +144,6 @@ localStorage dan jawaban peserta disimulasikan agar grafik host bergerak.
 | PIN selalu salah | PIN di Script Properties berbeda dari yang diketik. Jalankan menu *Atur PIN host* atau hapus properti `HOST_PIN`. |
 | Grafik host tidak bergerak | Peserta belum menjawab, atau polling gagal (cek banner koneksi). Di mode demo, pastikan `DEMO_AUTOFILL` aktif. |
 | Jawaban tidak masuk | Sesi belum dibuka, atau pertanyaan sudah berganti saat peserta mengirim. Peserta cukup memuat ulang. |
+| Jawaban tampil di web tapi tidak ada di spreadsheet | Buka `<API_URL>?action=ping`: `spreadsheet`/`spreadsheetUrl` menunjukkan file yang benar-benar ditulis. Lalu lihat tab **Survei Town Hall** (bukan tab Google Form). |
+| Jawaban hilang setelah menekan "Sesi baru" | Tombol itu **menghapus semua baris jawaban** di sheet. Gunakan hanya sebelum acara baru, bukan saat sesi berjalan. |
 | QR tidak muncul | CDN qrcodejs diblokir; tautan peserta tetap tercetak di bawah QR. |

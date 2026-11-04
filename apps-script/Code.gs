@@ -93,16 +93,7 @@ function doPost(e) {
 function route_(p) {
   var action = String(p.action || "state");
 
-  if (action === "ping") {
-    return {
-      ok: true,
-      app: "survey-town-hall",
-      version: 1,
-      questions: QUESTIONS.length,
-      sheet: RESPONSES_SHEET,
-      now: new Date().toISOString()
-    };
-  }
+  if (action === "ping") return ping_();
 
   if (action === "state") return publicState_(p.rid);
 
@@ -191,6 +182,37 @@ function requirePin_(pin) {
 }
 
 /* ------------------------------------------------------------------- SHEET */
+
+/**
+ * Diagnostik: memastikan script terikat ke spreadsheet yang benar.
+ * Buka `<URL>/exec?action=ping` di browser untuk melihat nama, URL, dan
+ * jumlah baris jawaban yang benar-benar dibaca script.
+ */
+function ping_() {
+  var out = {
+    ok: true,
+    app: "survey-town-hall",
+    version: 2,
+    questions: QUESTIONS.length,
+    sheet: RESPONSES_SHEET,
+    now: new Date().toISOString()
+  };
+
+  try {
+    var ss = spreadsheet_();
+    out.spreadsheet = ss.getName();
+    out.spreadsheetUrl = ss.getUrl();
+    out.sheets = ss.getSheets().map(function (s) { return s.getName(); });
+
+    var sh = ss.getSheetByName(RESPONSES_SHEET);
+    out.responseSheetExists = !!sh;
+    out.responseRows = sh ? Math.max(0, sh.getLastRow() - 1) : 0;
+  } catch (err) {
+    out.spreadsheetError = String((err && err.message) || err);
+  }
+
+  return out;
+}
 
 function spreadsheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
