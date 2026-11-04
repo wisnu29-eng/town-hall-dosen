@@ -511,7 +511,13 @@
     }
 
     var code = document.getElementById("joinUrl");
-    if (code) code.textContent = url.replace(/^https?:\/\//, "");
+    if (code) {
+      // Tampilkan bentuk pendek: tanpa https:// dan tanpa /index.html.
+      // Tautan dan QR tetap memakai URL lengkap.
+      code.textContent = url
+        .replace(/^https?:\/\//, "")
+        .replace(/\/index\.html(?=$|[?#])/, "/");
+    }
     var open = document.getElementById("joinOpen");
     if (open) open.href = url;
 

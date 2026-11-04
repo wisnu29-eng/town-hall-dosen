@@ -384,7 +384,7 @@ kbd{
 .qr__fb{font-size:.68rem;color:var(--grey-3);padding:8px;text-align:center}
 .h-join code{
   display:block;font-family:var(--mono);font-size:.64rem;line-height:1.5;
-  color:var(--grey-3);word-break:break-all;max-height:3em;overflow:hidden;
+  color:var(--grey-3);word-break:break-all;max-height:4.6em;overflow:hidden;
 }
 .h-join__open{
   display:inline-block;margin-top:7px;font-size:.68rem;font-weight:500;
