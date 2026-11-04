@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Town Hall Meeting Dosen — Hasil Langsung</title>
-<meta name="description" content="Hasil survei Town Hall Meeting Dosen, langsung dari Google Sheets.">
+<title>Survey Town Hall Meeting Dosen</title>
+<meta name="description" content="Survey Town Hall Meeting Dosen — satu pertanyaan setiap putaran, hasil langsung dibahas.">
 <meta name="theme-color" content="#FAFAF8">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230A35F5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,42 +12,40 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/styles.css">
 </head>
-<body>
+<body class="page page--participant">
 
-<div class="app">
-  <aside class="rail">
-    <div class="brand">
-      <span class="brand__name" id="brandName">Town Hall Meeting Dosen</span>
-      <small id="brandSub">Survei anonim · hasil langsung</small>
+<div class="p-shell">
+  <header class="p-top">
+    <div class="p-brand">
+      <span class="mark" aria-hidden="true"></span>
+      <span id="brandName">Survey Town Hall Meeting Dosen</span>
     </div>
+    <div class="p-conn" id="conn"><i class="dot" aria-hidden="true"></i><span>Menghubungkan…</span></div>
+  </header>
 
-    <nav class="list" id="nav" aria-label="Bagian"></nav>
-
-    <div class="live">
-      <b id="nCount">0</b>
-      <span class="live__cap">responden</span>
-      <div class="live__row"><i class="dot"></i>Diperbarui <time id="updated">--:--</time></div>
-      <div class="live__row live__row--muted" id="hint">Spasi jeda · ← → pindah</div>
-      <div class="live__src" id="src">Google Sheets</div>
-    </div>
-  </aside>
-
-  <main>
-    <div class="stage" id="stage" aria-live="polite">
-      <div class="boot">Memuat data…</div>
-    </div>
+  <main class="p-main" id="stage" aria-live="polite">
+    <div class="boot">Memuat survei…</div>
   </main>
+
+  <footer class="p-foot">
+    <span>Anonim · tanpa nama &amp; email</span>
+    <span id="footMeta">—</span>
+  </footer>
 </div>
 
 <div class="banner" id="banner" hidden>
-  <span id="bannerText">Menghubungkan…</span>
+  <span id="bannerText">Koneksi terputus.</span>
   <button type="button" id="bannerRetry">Coba lagi</button>
+  <a id="bannerDemo" href="?demo=1">Mode demo</a>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+<div class="toast" id="toast" hidden></div>
+
 <script src="assets/js/config.js"></script>
+<script src="assets/js/questions.js"></script>
 <script src="assets/js/format.js"></script>
+<script src="assets/js/demo.js"></script>
 <script src="assets/js/api.js"></script>
-<script src="assets/js/deck.js"></script>
+<script src="assets/js/participant.js"></script>
 </body>
 </html>

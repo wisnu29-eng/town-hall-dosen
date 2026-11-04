@@ -1,38 +1,88 @@
 /* ============================================================================
    DATA LAYER
-   - Membaca JSON dari Apps Script Web App lewat JSONP (bebas CORS)
-   - Polling ringan: cek "versi" dulu, ambil data penuh hanya bila berubah
-   - Mode demo: data contoh dengan bentuk yang sama seperti sheet asli
+   ----------------------------------------------------------------------------
+   - Apps Script Web App lewat JSONP (bebas CORS)
+   - Aksi: state · hostState · answer · host
+   - Mode demo otomatis di localhost/file:// atau dengan ?demo=1
    ========================================================================== */
 (function (global) {
   "use strict";
 
   var CFG = global.APP_CONFIG || {};
   var ENDPOINT = (CFG.API_URL || "").trim();
-  var MOCK = CFG.MOCK === null || CFG.MOCK === undefined ? !ENDPOINT : !!CFG.MOCK;
-  var POLL_MS = CFG.POLL_MS || 10000;
-  var FULL_REFRESH_MS = CFG.FULL_REFRESH_MS || 300000;
-  var SNAPSHOT_URL = CFG.SNAPSHOT_URL || "assets/data/snapshot.json";
+  var seq = 0;
 
-  /* Pratinjau: bila API_URL kosong, pakai potret data asli (bukan data palsu). */
-  var SNAPSHOT = null;
-  var snapshotTried = false;
+  function param(name) {
+    try {
+      return new URLSearchParams(global.location.search).get(name);
+    } catch (e) { return null; }
+  }
 
-  var state = {
-    version: null,
-    lastFull: 0,
-    timer: null,
-    inflight: false,
-    handlers: { data: null, status: null, error: null }
-  };
+  function isDemoMode() {
+    if (CFG.DEMO === true) return true;
+    if (CFG.DEMO === false) return false;
+    if (param("demo") === "1") return true;
+    if (param("demo") === "0") return false;   // paksa live (untuk uji lokal)
+    if (!ENDPOINT) return true;
+    var host = global.location.hostname;
+    return global.location.protocol === "file:" ||
+      host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "";
+  }
+
+  var DEMO = isDemoMode();
+
+  if (DEMO && global.DEMO_BACKEND && param("reset") === "1") {
+    global.DEMO_BACKEND.reset();
+  }
+
+  /* ------------------------------------------------------------------ ID -- */
+  function makeId() {
+    try {
+      if (global.crypto && global.crypto.randomUUID) return global.crypto.randomUUID();
+    } catch (ignore) { /* lanjut */ }
+    var s = "";
+    for (var i = 0; i < 4; i++) {
+      s += Math.random().toString(36).slice(2, 8);
+    }
+    return "r-" + s;
+  }
+
+  var RID_KEY = "th_rid_v1";
+  var RID = "";
+  try {
+    RID = global.localStorage.getItem(RID_KEY) || "";
+    if (!RID) {
+      RID = makeId();
+      global.localStorage.setItem(RID_KEY, RID);
+    }
+  } catch (e) {
+    RID = makeId();
+  }
+
+  /* ----------------------------------------------------------------- PIN -- */
+  var PIN_KEY = "th_host_pin";
+  var pinFromUrl = param("pin");
+  if (pinFromUrl) {
+    try { global.sessionStorage.setItem(PIN_KEY, pinFromUrl); } catch (ignore) { /* abaikan */ }
+  }
+
+  function getPin() {
+    try { return global.sessionStorage.getItem(PIN_KEY) || ""; } catch (e) { return ""; }
+  }
+  function setPin(pin) {
+    try {
+      if (pin) global.sessionStorage.setItem(PIN_KEY, pin);
+      else global.sessionStorage.removeItem(PIN_KEY);
+    } catch (ignore) { /* abaikan */ }
+  }
 
   /* ---------------------------------------------------------------- JSONP -- */
-  var seq = 0;
-  function jsonp(url, params, timeout) {
+  function jsonp(params, timeout) {
     return new Promise(function (resolve, reject) {
-      var name = "__dsb_cb_" + Date.now().toString(36) + "_" + (++seq);
+      var name = "__th_cb_" + Date.now().toString(36) + "_" + (++seq);
       var script = document.createElement("script");
       var done = false;
+
       var qs = [];
       Object.keys(params || {}).forEach(function (k) {
         qs.push(encodeURIComponent(k) + "=" + encodeURIComponent(params[k]));
@@ -43,8 +93,8 @@
         if (done) return;
         done = true;
         cleanup();
-        reject(new Error("timeout"));
-      }, timeout || 15000);
+        reject(new Error("Waktu habis — server tidak merespons"));
+      }, timeout || 20000);
 
       function cleanup() {
         clearTimeout(timer);
@@ -63,242 +113,134 @@
         if (done) return;
         done = true;
         cleanup();
-        reject(new Error("network"));
+        reject(new Error("Gagal terhubung ke server"));
       };
 
-      script.src = url + (url.indexOf("?") === -1 ? "?" : "&") + qs.join("&");
+      script.src = ENDPOINT + (ENDPOINT.indexOf("?") === -1 ? "?" : "&") +
+        qs.join("&") + "&_t=" + Date.now();
       document.head.appendChild(script);
     });
   }
 
-  /* ------------------------------------------------------------------ MOCK -- */
-  var MOCK_DATA = (function () {
-    var QUESTIONS = [
-      "Seberapa penting kurikulum di-update secara berkala agar tetap relevan dengan perkembangan ilmu dan isu keuangan negara saat ini?",
-      "Seberapa penting RPS diperbarui setiap semester supaya materi kuliah tetap relevan dan tidak hanya copy-paste dari semester sebelumnya?",
-      "Seberapa penting penerapan metode pembelajaran inovatif, seperti case-based learning dan project-based learning, dalam meningkatkan kualitas pembelajaran mahasiswa?",
-      "Seberapa penting penggunaan Learning Management System (LMS) untuk mendukung proses pembelajaran yang lebih efektif dan efisien?",
-      "Seberapa penting penggunaan literatur dan referensi terbaru dalam mendukung kualitas materi serta proses pembelajaran?",
-      "Seberapa penting kesempatan naik jenjang karier atau jabatan akademik dalam mendukung pengembangan diri dosen?"
-    ];
-    var CHOICE_Q = "Jika dari beberapa aktivitas atau kewajiban berikut ada satu yang boleh dikurangi atau dihilangkan, akan pilih yang mana?";
-    var CHOICES = [
-      { label: "Penugasan tambahan di luar tugas utama", w: 56 },
-      { label: "Kewajiban publikasi di jurnal terindeks Scopus", w: 26 },
-      { label: "Kolaborasi lintas fungsi (cross-function)", w: 30 },
-      { label: "Kewajiban melakukan penelitian", w: 20 },
-      { label: "Kewajiban menggunakan database dalam penugasan", w: 19 }
-    ];
-    /* Sebaran jawaban contoh, meniru hasil survei asli. */
-    var DISTS = [
-      [2, 2, 8, 23, 46, 70],
-      [3, 3, 5, 32, 51, 57],
-      [0, 2, 12, 17, 49, 71],
-      [0, 7, 11, 29, 49, 55],
-      [1, 3, 8, 22, 52, 65],
-      [1, 4, 9, 43, 61, 33]
-    ];
+  /* ---------------------------------------------------------------- CALL -- */
+  function call(action, params) {
+    params = params || {};
 
-    var COLUMNS = ["Timestamp"].concat(QUESTIONS).concat([CHOICE_Q]);
-    var TYPES = ["datetime"].concat(QUESTIONS.map(function () { return "number"; })).concat(["string"]);
-
-    var rnd = mulberry32(20261030);
-    var rows = [];
-    var version = 1;
-
-    function mulberry32(a) {
-      return function () {
-        a |= 0; a = a + 0x6D2B79F5 | 0;
-        var t = Math.imul(a ^ a >>> 15, 1 | a);
-        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-        return ((t ^ t >>> 14) >>> 0) / 4294967296;
-      };
-    }
-
-    function sampleDist(dist) {
-      var total = 0, i;
-      for (i = 0; i < dist.length; i++) total += dist[i];
-      var r = rnd() * total;
-      for (i = 0; i < dist.length; i++) {
-        r -= dist[i];
-        if (r <= 0) return i + 1;
-      }
-      return dist.length;
-    }
-
-    function sampleChoice() {
-      var total = 0, i;
-      for (i = 0; i < CHOICES.length; i++) total += CHOICES[i].w;
-      var r = rnd() * total;
-      for (i = 0; i < CHOICES.length; i++) {
-        r -= CHOICES[i].w;
-        if (r <= 0) return CHOICES[i].label;
-      }
-      return CHOICES[0].label;
-    }
-
-    function makeRow(date) {
-      return [date.toISOString()]
-        .concat(DISTS.map(sampleDist))
-        .concat([sampleChoice()]);
-    }
-
-    (function build() {
-      var now = Date.now();
-      for (var i = 0; i < 151; i++) {
-        rows.push(makeRow(new Date(now - (151 - i) * 97000)));
-      }
-    })();
-
-    return {
-      payload: function (withRows) {
-        var p = {
-          ok: true,
-          v: String(version),
-          updatedAt: new Date().toISOString(),
-          sheet: "Form Responses 1 (contoh)",
-          columns: COLUMNS,
-          types: TYPES,
-          count: rows.length,
-          demo: true
-        };
-        if (withRows) p.rows = rows.map(function (r) { return r.slice(); });
-        return p;
-      },
-      ping: function () {
-        return { ok: true, v: String(version), updatedAt: new Date().toISOString(), count: rows.length };
-      },
-      tick: function () {
-        rows.push(makeRow(new Date()));
-        version++;
-      }
-    };
-  })();
-
-  /* ------------------------------------------------------------- REQUESTS -- */
-  function loadSnapshot() {
-    if (SNAPSHOT) return Promise.resolve(SNAPSHOT);
-    if (snapshotTried) return Promise.resolve(MOCK_DATA.payload(true));
-    snapshotTried = true;
-
-    return fetch(SNAPSHOT_URL, { cache: "no-store" })
-      .then(function (r) {
-        if (!r.ok) throw new Error("snapshot " + r.status);
-        return r.json();
-      })
-      .then(function (json) {
-        if (!json || !json.rows || !json.rows.length) throw new Error("snapshot kosong");
-        json.demo = true;
-        SNAPSHOT = json;
-        API.isSnapshot = true;
-        return json;
-      })
-      .catch(function () {
-        return MOCK_DATA.payload(true);
-      });
-  }
-
-  function fetchData(fresh) {
-    if (MOCK) return Promise.resolve(MOCK_DATA.payload(true));
-    return jsonp(ENDPOINT, { _t: Date.now(), fresh: fresh ? "1" : "0" }, 20000);
-  }
-
-  /* --------------------------------------------------------------- PUBLIC -- */
-  var API = {
-    isMock: MOCK,
-    isSnapshot: false,
-    endpoint: ENDPOINT,
-
-    load: function (opts) {
-      if (MOCK) return loadSnapshot();
-      opts = opts || {};
-      return fetchData(!!opts.force).then(function (payload) {
-        if (!payload || payload.ok === false) {
-          throw new Error((payload && payload.error) || "Respons tidak valid");
-        }
-        state.version = String(payload.v || "");
-        state.lastFull = Date.now();
-        return payload;
-      });
-    },
-
-    check: function () {
-      if (state.inflight) return Promise.resolve(null);
-      state.inflight = true;
-      var stale = Date.now() - state.lastFull > FULL_REFRESH_MS;
-
-      /* Satu permintaan saja per putaran: ambil data lengkap lalu bandingkan
-         versinya di browser. Lebih cepat daripada ping lalu ambil data,
-         karena setiap permintaan ke Apps Script butuh ~2 detik. */
-      return fetchData(false)
-        .then(function (payload) {
-          if (!payload || payload.ok === false) throw new Error("data gagal");
-          var changed = String(payload.v || "") !== state.version;
-          state.inflight = false;
-
-          if (changed || stale) {
-            state.version = String(payload.v || "");
-            state.lastFull = Date.now();
-            if (state.handlers.data) state.handlers.data(payload);
-            if (state.handlers.status) state.handlers.status("ok", { mock: MOCK, at: new Date() });
-            return payload;
+    if (DEMO) {
+      return new Promise(function (resolve, reject) {
+        setTimeout(function () {
+          try {
+            if (!global.DEMO_BACKEND) throw new Error("Modul demo tidak ditemukan");
+            resolve(global.DEMO_BACKEND.call(action, params));
+          } catch (err) {
+            reject(new Error(String((err && err.message) || err)));
           }
-          if (state.handlers.status) state.handlers.status("ok", { mock: MOCK, at: new Date() });
-          return null;
-        })
-        .catch(function (err) {
-          state.inflight = false;
-          if (state.handlers.status) state.handlers.status("error", null, err);
-          throw err;
-        });
+        }, 140 + Math.random() * 220);
+      });
+    }
+
+    params.action = action;
+    return jsonp(params, 20000).then(function (payload) {
+      if (!payload || payload.ok === false) {
+        throw new Error((payload && payload.error) || "Respons server tidak valid");
+      }
+      if ((action === "state" || action === "hostState") && !payload.session) {
+        throw new Error("Backend belum mendukung mode survei — deploy ulang Apps Script.");
+      }
+      return payload;
+    });
+  }
+
+  /* ----------------------------------------------------------------- API -- */
+  var API = {
+    isDemo: DEMO,
+    endpoint: ENDPOINT,
+    rid: RID,
+
+    getPin: getPin,
+    setPin: setPin,
+
+    state: function () {
+      return call("state", { rid: RID });
     },
 
-    start: function (handlers) {
-      state.handlers = handlers || {};
-      var self = this;
+    hostState: function () {
+      return call("hostState", { pin: getPin() });
+    },
+
+    answer: function (qid, value) {
+      return call("answer", { rid: RID, qid: qid, value: value });
+    },
+
+    host: function (op, extra) {
+      var p = { op: op, pin: getPin() };
+      if (extra) {
+        Object.keys(extra).forEach(function (k) { p[k] = extra[k]; });
+      }
+      return call("host", p);
+    },
+
+    ping: function () {
+      return call("ping", {});
+    },
+
+    /* Polling tanpa tumpang tindih; berhenti saat tab tidak terlihat.
+       `interval` boleh berupa angka atau fungsi (interval adaptif).
+       Jeda diberi variasi ±20% agar 200 peserta tidak membanjiri server
+       pada detik yang sama. */
+    poll: function (fn, interval) {
+      var stopped = false;
+      var busy = false;
+      var timer = null;
+
+      function nextMs() {
+        var base = typeof interval === "function" ? interval() : interval;
+        base = Number(base) || 5000;
+        var jitter = base * 0.2 * (Math.random() * 2 - 1);
+        return Math.max(800, Math.round(base + jitter));
+      }
 
       function schedule(ms) {
-        clearTimeout(state.timer);
-        state.timer = setTimeout(tick, Math.max(0, ms));
+        clearTimeout(timer);
+        timer = setTimeout(loop, Math.max(600, ms));
       }
 
-      /* Jeda dihitung dari saat permintaan SEBELUMNYA dimulai. Kalau Apps Script
-         butuh ~3 detik, putaran berikutnya langsung jalan 200 ms setelah selesai,
-         jadi tidak menunggu dua kali lipat (2 dtk + 3 dtk). */
-      function tick() {
-        if (document.hidden) { schedule(POLL_MS); return; }
+      function loop() {
+        if (stopped) return;
+        if (document.hidden) { schedule(nextMs()); return; }
+        if (busy) { schedule(nextMs()); return; }
 
-        if (MOCK) {
-          if (SNAPSHOT) {
-            if (state.handlers.status) state.handlers.status("snapshot", { mock: true, at: new Date() });
-          } else {
-            MOCK_DATA.tick();
-            if (state.handlers.data) state.handlers.data(MOCK_DATA.payload(true));
-            if (state.handlers.status) state.handlers.status("ok", { mock: true, at: new Date() });
-          }
-          schedule(POLL_MS);
-          return;
-        }
-
-        var t0 = Date.now();
-        self.check()
-          .catch(function () { /* status sudah dilaporkan */ })
+        busy = true;
+        Promise.resolve()
+          .then(fn)
+          .catch(function () { /* status ditangani pemanggil */ })
           .then(function () {
-            schedule(POLL_MS - (Date.now() - t0));
+            busy = false;
+            if (!stopped) schedule(nextMs());
           });
       }
 
-      if (state.handlers.status) state.handlers.status(MOCK ? "mock" : "connecting", { mock: MOCK, at: new Date() });
-      schedule(POLL_MS);
-    },
+      function onVisible() {
+        if (!document.hidden) {
+          clearTimeout(timer);
+          loop();
+        }
+      }
 
-    stop: function () {
-      clearTimeout(state.timer);
-      state.timer = null;
-    },
+      document.addEventListener("visibilitychange", onVisible);
+      loop();
 
-    refresh: function () {
-      return this.load({ force: true });
+      return {
+        stop: function () {
+          stopped = true;
+          clearTimeout(timer);
+          document.removeEventListener("visibilitychange", onVisible);
+        },
+        now: function () {
+          clearTimeout(timer);
+          loop();
+        }
+      };
     }
   };
 

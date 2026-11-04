@@ -1,186 +1,146 @@
-# Town Hall Meeting Dosen — Hasil Langsung
+# Survey Town Hall Meeting Dosen
+
+Platform survei dua layar untuk Town Hall Meeting:
+
+- **Peserta** — `index.html`: satu pertanyaan pada satu waktu, anonim, tanpa nama/email.
+- **Host** — `host.html`: PIN-gated, mengendalikan alur *buka pertanyaan → tampilkan hasil →
+  lanjut*, dengan angka dan grafik yang diperbarui realtime.
+
+Alurnya mengikuti rapat: host membuka pertanyaan, dosen menjawab, host menampilkan hasil
+untuk dibahas, lalu lanjut ke pertanyaan berikutnya. Setelah pertanyaan terakhir, host
+mendapat ringkasan sesi.
 
 **Live:** https://wisnu29-eng.github.io/town-hall-dosen/
 
-Halaman hasil survei bergaya dek presentasi (Swiss / IKB), membaca langsung dari
-Google Sheets. Setiap kiriman Google Form muncul tanpa refresh dan tanpa ekspor
-manual.
+| Halaman | URL |
+| --- | --- |
+| Peserta | `/index.html` (atau `/`) |
+| Host | `/host.html` — PIN default `1234` |
+| Demo peserta | `/index.html?demo=1` |
+| Demo host | `/host.html?demo=1&pin=1234` |
 
-- **Tampilan**: satu slide per pertanyaan, angka besar, histogram, peringkat pilihan,
-  pindah otomatis tiap 12 detik, navigasi `←` `→`, spasi untuk jeda.
-- **Data**: Google Sheets → Apps Script (JSONP) → halaman statis. Aman untuk GitHub Pages.
-- **Animasi**: GSAP 3 (angka berjalan, batang tumbuh, transisi antar slide, FLIP saat
-  peringkat berubah). Menghormati `prefers-reduced-motion`.
-- **Kolom dideteksi otomatis**: kolom angka 1–N menjadi slide skala, kolom teks pilihan
-  menjadi slide peringkat, dan slide pertama merangkum semuanya.
+## Pertanyaan
+
+Enam pertanyaan sesuai Google Form, dibahas berurutan:
+
+1. **Kurikulum** — skala 1–6
+2. **RPS** — skala 1–6
+3. **Metode pembelajaran** — skala 1–6
+4. **LMS** — skala 1–5 (mengikuti formulir)
+5. **Literatur** — skala 1–6
+6. **Aktivitas yang dikurangi** — pilih satu dari 5 opsi
+
+Skala 1–6: Sangat Tidak Penting → Sangat Penting. Teks lengkap ada di
+`assets/js/questions.js`.
+
+## Struktur
 
 ```
-index.html
-assets/css/styles.css
-assets/js/config.js      ← satu-satunya file yang perlu diubah
-assets/js/format.js
-assets/js/api.js
-assets/js/deck.js
+index.html               ← layar peserta
+host.html                ← layar host (PIN)
+assets/css/styles.css    ← peserta + host, Swiss/IKB, responsif
+assets/js/config.js      ← SATU-SATUNYA file yang perlu diubah saat deploy
+assets/js/questions.js   ← teks pertanyaan, skala, opsi
+assets/js/format.js      ← utilitas format angka/teks
+assets/js/api.js         ← JSONP ke Apps Script, polling, deteksi demo
+assets/js/demo.js        ← backend demo (localStorage) + simulasi jawaban
+assets/js/participant.js ← alur layar peserta
+assets/js/host.js        ← alur, rail pertanyaan, grafik, PIN
 apps-script/Code.gs      ← tempel ke Apps Script
 apps-script/appsscript.json
 ```
 
----
+## Deploy
 
-## 1. Deploy backend (sekali saja, ±3 menit)
+### 1. Apps Script
 
-1. Buka spreadsheet Anda → **Extensions → Apps Script**.
+1. Buka spreadsheet tujuan (boleh spreadsheet Google Form lama) → **Extensions → Apps Script**.
 2. Hapus isi `Code.gs`, tempel seluruh isi `apps-script/Code.gs`.
-   Bila data bukan di tab pertama, isi `SHEET_NAME = "Form Responses 1"` di baris atas.
-3. **Deploy → New deployment → Web app**
-   - Description: `dashboard`
-   - Execute as: **Me**
-   - Who has access: **Anyone**
-4. Klik **Deploy**, izinkan akses, lalu salin URL yang berakhiran **`/exec`**.
-5. Jalankan fungsi **`installTriggers`** sekali (pilih di dropdown lalu ▶ Run).
-   Ini memasang trigger `onFormSubmit` supaya data langsung ter-update saat ada
-   kiriman baru. Bisa juga lewat menu **Dashboard → Pasang pembaruan otomatis**
-   setelah halaman di-reload.
+3. Sesuaikan bila perlu:
+   - `HOST_PIN` — ganti dari `1234`.
+   - `RESPONSES_SHEET` — nama tab jawaban (default `Survei Town Hall`, dibuat otomatis).
+4. **Deploy → New deployment → Web app**
+   - *Execute as*: **Me**
+   - *Who has access*: **Anyone**
+5. Salin URL yang berakhiran `/exec`.
 
-Uji cepat di browser:
+Jika Web App sudah pernah di-deploy: **Deploy → Manage deployments → ✏️ → Version:
+New version → Deploy**. URL tetap sama, jadi `API_URL` tidak perlu diubah.
 
-```
-https://script.google.com/macros/s/XXXX/exec?action=ping
-```
+Jawaban ditulis ke tab `Survei Town Hall` dengan kolom:
 
-Harus muncul JSON `{"ok":true,...}`.
+| Waktu | RespondentID | Kode | Pertanyaan | Jawaban | Nilai |
+| --- | --- | --- | --- | --- | --- |
 
-## 2. Hubungkan halaman
+`RespondentID` adalah UUID acak di localStorage peserta — tidak ada nama, email, atau IP.
 
-Buka `assets/js/config.js`, isi:
+Ganti PIN kapan saja lewat menu **Survey Town Hall → Atur PIN host** di spreadsheet
+(disimpan di Script Properties, menimpa `HOST_PIN`). Menu juga menyediakan
+**Hapus semua jawaban** dan **Lihat URL web app**.
 
-```js
-API_URL: "https://script.google.com/macros/s/XXXX/exec",
-```
+### 2. GitHub Pages
 
-Simpan. Halaman langsung memakai data asli. Selama `API_URL` kosong, halaman
-menampilkan **potret data asli** dari `assets/data/snapshot.json` (angka di layar
-sama dengan isi sheet saat potret dibuat, tetapi belum ikut berubah). Potret itu
-hanya untuk pratinjau — setelah `API_URL` diisi, file tersebut tidak dipakai lagi.
+1. Salin URL `/exec` ke `API_URL` di `assets/js/config.js`.
+2. Commit & push. GitHub Pages menyajikan `index.html` dan `host.html` dari root.
+3. Buka `host.html`, masukkan PIN, lalu tampilkan layar host (proyektor) dan bagikan QR
+   peserta yang muncul di rail kiri.
 
-> Ingin memperbarui potret? Jalankan ulang skrip pembuatnya, atau cukup isi
-> `API_URL` dan data akan selalu segar.
+Tidak ada build step dan tidak ada dependensi lokal selain CDN QR Code (qrcodejs).
 
-## 3. Hosting GitHub Pages
+## Mode demo
 
-```bash
-git add .
-git commit -m "deck survei town hall + data sheets"
-git branch -M main
-git remote add origin https://github.com/USERNAME/REPO.git
-git push -u origin main
-```
+Demo aktif otomatis saat halaman dibuka dari `localhost`, `127.0.0.1`, atau `file://`,
+atau dipaksa dengan `?demo=1`. Tidak ada backend yang dipanggil; jawaban disimpan di
+localStorage dan jawaban peserta disimulasikan agar grafik host bergerak.
 
-Lalu **Settings → Pages → Source: Deploy from a branch → `main` / `/ (root)`**.
-Situs tersedia di `https://USERNAME.github.io/REPO/`.
+- Reset data demo: `?demo=1&reset=1`
+- PIN demo: `1234`
+- Paksa live di localhost (uji backend asli): `?demo=0`
+- Key localStorage: `th_survey_demo_v3`
+- Matikan simulasi: `DEMO_AUTOFILL: false` di `config.js`
 
-File `.nojekyll` sudah disertakan agar folder `assets/` tidak diproses Jekyll.
+## Konfigurasi (`assets/js/config.js`)
 
----
+| Kunci | Arti |
+| --- | --- |
+| `API_URL` | URL Web App Apps Script (`/exec`). Kosong = demo. |
+| `RESPONSES_SHEET` | Nama tab jawaban. |
+| `DEMO` | `true` / `false` / `null` (otomatis per hostname). |
+| `DEMO_AUTOFILL` | Simulasi jawaban di mode demo. |
+| `POLL_MS_PARTICIPANT` | Polling peserta (default 10000 ms). |
+| `POLL_MS_HOST` | Polling host (default 3000 ms). |
+| `JOIN_URL` | URL/QR peserta. Kosong = `index.html` otomatis. |
+| `TITLE`, `SUBTITLE`, `ORG` | Teks yang tampil. |
+| `LOCALE` | Format angka, default `id-ID`. |
 
-## Cara data mengalir
+## Catatan operasional
 
-| Langkah | Yang terjadi |
-|---|---|
-| Halaman dibuka | `GET /exec` → JSON lengkap (kolom, tipe, baris) |
-| Tiap 2 detik | `GET /exec` → JSON lengkap; versinya dibandingkan di browser |
-| Versi berubah | Angka & batang bertween ke nilai baru (tanpa permintaan tambahan) |
-| Form terkirim | Baris baru masuk → versi berubah (trigger `onFormSubmit` mempercepat) |
+- **Host**: tombol di panel kanan — *Tampilkan hasil ke peserta*, *Pertanyaan berikutnya*,
+  *Sembunyikan hasil*, *Buka lagi untuk jawaban*. Klik pertanyaan di rail kiri untuk
+  lompat; `R` menampilkan/menyembunyikan hasil, `←` `→` pindah pertanyaan.
+- **Peserta**: jawaban tidak bisa diubah setelah dikirim. Satu jawaban per
+  `RespondentID` per pertanyaan; kiriman ganda diabaikan server.
+- **Sesi baru** menghapus semua jawaban (dengan konfirmasi) dan mengembalikan sesi ke
+  *Belum dimulai*.
+- **Skala 200 peserta**: peserta memanggil Apps Script tiap 10 detik (host 3 detik),
+  dengan variasi acak ±20% agar tidak membanjiri server bersamaan. Saat sesi belum
+  dimulai polling peserta melambat ke 15 detik, dan 30 detik setelah sesi selesai.
+  Artinya perubahan dari host terlihat di layar peserta dalam **±10 detik** — beri
+  jeda singkat sebelum mengharapkan jawaban.
+- **Kuota**: cache agregat 2 detik + pembaruan inkremental per jawaban membuat
+  polling tidak membaca ulang seluruh sheet. Untuk acara lebih dari ~2 jam atau
+  lebih dari 300 peserta, naikkan `POLL_MS_PARTICIPANT` ke 15000.
+- **Keamanan**: PIN host hanya dikirim ke Apps Script dan diverifikasi di server; halaman
+  host menyimpannya di `sessionStorage`. Peserta tidak pernah menerima data host.
+- **Teks pertanyaan ada di dua tempat** — `assets/js/questions.js` (tampilan) dan
+  `QUESTIONS` di `apps-script/Code.gs` (validasi jawaban). Ubah keduanya bersamaan.
 
-Versi = nomor bump + jumlah baris + hash baris terakhir, sehingga perubahan isi
-sel juga terdeteksi. Satu putaran polling hanya memakai **satu** permintaan ke
-Apps Script; dulu dua (ping lalu data) sehingga latensinya dobel.
+## Troubleshooting
 
-**Latensi normal: 2–4 detik** setelah kiriman masuk. Batas bawahnya adalah waktu
-respons Apps Script itu sendiri (±2–3 detik per permintaan, termasuk satu
-pengalihan `script.google.com` → `script.googleusercontent.com`), jadi
-menurunkan `POLL_MS` di bawah ~2500 tidak banyak menolong. Kalau yang membuka
-halaman banyak (mis. 20+ orang bersamaan), naikkan `POLL_MS` ke 5000–8000 agar
-kuota Apps Script tidak cepat habis.
-
----
-
-## Mengatur tampilan data
-
-Semua pengaturan ada di `assets/js/config.js`.
-
-**Label pendek** untuk daftar kiri dan ringkasan:
-
-```js
-LABELS: [
-  { match: "kurikulum", label: "Kurikulum" },
-  { match: "rps",       label: "RPS" },
-  ...
-]
-```
-
-`match` dicocokkan dengan teks pertanyaan (huruf kecil). Urutan penting: taruh yang
-paling spesifik lebih dulu.
-
-**Memaksa kolom tertentu** (bila ada kolom angka lain yang ikut terdeteksi):
-
-```js
-COLUMNS: {
-  likert: ["Kurikulum", "RPS", "metode pembelajaran", "LMS", "literatur", "karier"],
-  choice: "dikurangi"
-}
-```
-
-**Lain-lain**: `TITLE`, `SUBTITLE`, `SUMMARY_HEADLINE`, `ROTATE_MS`, `LIKERT_MAX`.
-
-**Ukuran tampilan.** Dek otomatis menyesuaikan diri: ukuran huruf mengikuti lebar
-*dan* tinggi jendela, jadi isi slide selalu muat penuh tanpa perlu zoom browser.
-Bila di layar/proyektor Anda hasilnya terasa terlalu besar atau terlalu kecil,
-cukup ubah satu angka:
-
-```js
-DISPLAY_SCALE: 1      // 0.9 = lebih kecil, 1.1 = lebih besar
-```
-
-Teks skala ("Sangat tidak penting" … "Sangat penting") dipilih otomatis dari kata
-kunci pada pertanyaan: *penting*, *setuju*, *puas*, *sering*.
-
-**Cara angka Likert dihitung.** Tiap slide aspek menampilkan dua hal:
-
-1. **Angka besar `8 dari 10`** — proporsi dosen yang memilih dua nilai tertinggi
-   (5 atau 6), dibulatkan ke satuan per sepuluh. Dipakai karena paling mudah
-   diucapkan di rapat.
-2. **Rincian per nilai** — `27% dosen menilai 5 · 40 dari 151` dan
-   `15% dosen menilai 6 · 22 dari 151`, supaya terlihat dari mana angka besar
-   itu berasal.
-
-Grafik batang di kanan menunjukkan sebaran seluruh jawaban 1–6 (jumlah orang
-dan persentasenya di atas tiap batang). Tidak ada skor rata-rata atau kategori
-yang ditampilkan.
-
-Slide **Ringkasan** berupa kartu per aspek: cincin (donat) sebaran jawaban 1–6
-dengan total responden di tengah, dan daftar persentase tiap nilai di kanannya.
-Pertanyaan pilihan (ke-7) memakai kartu selebar baris dengan daftar opsi dua
-kolom.
-
-**Tautan ke slide tertentu**: buka `index.html#4` untuk langsung ke slide ke-4
-(berguna saat rapat atau saat mengirim tautan ke bagian tertentu).
-
----
-
-## Jika ada masalah
-
-| Gejala | Penyebab & solusi |
-|---|---|
-| Banner "Gagal memuat data" | `API_URL` salah / deployment belum "Anyone". Buka URL `/exec` di tab baru. |
-| Semua slide kosong | Tidak ada kolom angka 1–N. Isi `COLUMNS.likert` manual. |
-| Angka tidak berubah | Trigger belum terpasang → jalankan `installTriggers`, atau tunggu cache 20 detik. |
-| Slide bertambah/berkurang | Jumlah kolom berubah di sheet; halaman membangun ulang otomatis. |
-| Teks label aneh | Tambahkan entri `LABELS` yang cocok. |
-| Terasa terlalu besar / kecil | Ubah `DISPLAY_SCALE` (0.9 atau 1.1) di `config.js`. |
-
-## Catatan keamanan
-
-Akses **Anyone** membuat URL `/exec` dapat dibaca siapa pun yang tahu alamatnya.
-Cocok untuk survei internal yang tidak rahasia. Untuk data sensitif, batasi akses
-web app (mis. "Anyone with Google account") dan sesuaikan pemuatan data.
+| Gejala | Penyebab / solusi |
+| --- | --- |
+| Peserta menampilkan "Backend belum mendukung mode survei" | `Code.gs` lama masih ter-deploy. Deploy ulang Web App dan perbarui `API_URL`. |
+| PIN selalu salah | PIN di Script Properties berbeda dari yang diketik. Jalankan menu *Atur PIN host* atau hapus properti `HOST_PIN`. |
+| Grafik host tidak bergerak | Peserta belum menjawab, atau polling gagal (cek banner koneksi). Di mode demo, pastikan `DEMO_AUTOFILL` aktif. |
+| Jawaban tidak masuk | Sesi belum dibuka, atau pertanyaan sudah berganti saat peserta mengirim. Peserta cukup memuat ulang. |
+| QR tidak muncul | CDN qrcodejs diblokir; tautan peserta tetap tercetak di bawah QR. |
